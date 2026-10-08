@@ -168,13 +168,12 @@ public List<CreditTransactionDTO> getTransactionHistory(Long customerId) {
     Customer customer = customerRepository.findById(customerId)
             .orElseThrow(() -> new EntityNotFoundException("Customer not found with id: " + customerId));
 
-    Credit credit = creditRepository.findByCustomer(customer)
-            .orElseThrow(() -> new EntityNotFoundException("No credit account found for customer id: " + customerId));
-
-    return creditTransactionRepository.findByCredit(credit)
-            .stream()
-            .map(CreditTransactionMapper::toDTO)
-            .collect(Collectors.toList());
+    return creditRepository.findByCustomer(customer)
+            .map(credit -> creditTransactionRepository.findByCredit(credit)
+                    .stream()
+                    .map(CreditTransactionMapper::toDTO)
+                    .collect(Collectors.toList()))
+            .orElseGet(List::of);
 }
     
 }

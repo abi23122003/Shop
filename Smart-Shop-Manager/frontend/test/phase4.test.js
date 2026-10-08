@@ -42,7 +42,7 @@ test("walk-in cash payload omits customer and credit requires a registered custo
 });
 
 test("API errors use safe user-facing messages for all required statuses", () => {
-  for (const status of [400, 403, 404, 409, 422, 500]) {
+  for (const status of [400, 403, 404, 409, 422, 500, 502, 503, 504]) {
     const message = getApiErrorMessage({
       response: { status, data: { message: "SQL exception and secret" } },
     });
@@ -51,6 +51,10 @@ test("API errors use safe user-facing messages for all required statuses", () =>
   assert.equal(
     getApiErrorMessage({ response: { status: 401 } }),
     "Your session expired. Please sign in again.",
+  );
+  assert.match(
+    getApiErrorMessage({ response: { status: 502 } }),
+    /backend is not responding/i,
   );
   assert.match(
     getApiErrorMessage({ request: {} }),

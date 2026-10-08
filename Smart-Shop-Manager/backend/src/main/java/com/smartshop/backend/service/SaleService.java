@@ -57,11 +57,14 @@ public SaleDTO saveSale(SaleDTO saleDTO) {
         : customerRepository.findById(saleDTO.getCustomerId())
             .orElseThrow(() -> new EntityNotFoundException("Customer not found with id: " + saleDTO.getCustomerId()));
 
-   if (!"Cash".equalsIgnoreCase(saleDTO.getPaymentMethod())
-           && !"Credit".equalsIgnoreCase(saleDTO.getPaymentMethod())) {
+   String paymentMethod = saleDTO.getPaymentMethod() == null ? "" : saleDTO.getPaymentMethod().trim();
+   if (!"Cash".equalsIgnoreCase(paymentMethod)
+           && !"UPI".equalsIgnoreCase(paymentMethod)
+           && !"Card".equalsIgnoreCase(paymentMethod)
+           && !"Credit".equalsIgnoreCase(paymentMethod)) {
        throw new IllegalArgumentException("Unsupported payment method");
    }
-   if ("Credit".equalsIgnoreCase(saleDTO.getPaymentMethod())
+   if ("Credit".equalsIgnoreCase(paymentMethod)
            && (customer == null || !Boolean.TRUE.equals(customer.getCreditEnabled()))) {
        throw new IllegalArgumentException("This customer is not enabled for credit purchases");
    }
@@ -75,7 +78,7 @@ sale.setSaleCode(saleDTO.getSaleCode() == null || saleDTO.getSaleCode().isBlank(
         : saleDTO.getSaleCode());
 sale.setSaleDate(saleDTO.getSaleDate());
 sale.setCustomer(customer);
-sale.setPaymentMethod(saleDTO.getPaymentMethod());
+sale.setPaymentMethod(normalizePaymentMethod(paymentMethod));
 
 BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -122,7 +125,7 @@ sale.setTotalAmount(totalAmount);
 
 Sale savedSale = saleRepository.save(sale);
 
-if ("Credit".equalsIgnoreCase(saleDTO.getPaymentMethod())) {
+ if ("Credit".equalsIgnoreCase(paymentMethod)) {
     Credit credit = creditRepository.findByCustomerForUpdate(customer).orElseGet(() -> {
         Credit created = new Credit();
         created.setCustomer(customer);
@@ -161,6 +164,13 @@ private BigDecimal valueOrZero(BigDecimal value) {
     return value == null ? BigDecimal.ZERO : value;
 }
 
+private String normalizePaymentMethod(String paymentMethod) {
+    if ("UPI".equalsIgnoreCase(paymentMethod)) return "UPI";
+    if ("CARD".equalsIgnoreCase(paymentMethod)) return "Card";
+    if ("CREDIT".equalsIgnoreCase(paymentMethod)) return "Credit";
+    return "Cash";
+}
+
 public List<SaleDTO> getAllSales() {
 
     return saleRepository.findAll()
@@ -195,7 +205,7 @@ public void deleteSale(Long id) {
                     .subtract(valueOrZero(sale.getTotalAmount())).max(BigDecimal.ZERO);
             credit.setBalance(updatedBalance);
             credit.setTotalCredit(updatedTotalCredit);
-            credit.setStatus(updatedBalance.signum() == 0 ? "CLEARED" : "PENDING");
+            credit.setStatus(updatedBalance.signum() == 0 ? "PAID" : "PENDING");
             creditRepository.save(credit);
         });
         creditTransactionRepository.deleteBySale(sale);
@@ -205,7 +215,8 @@ public void deleteSale(Long id) {
 }
 public SaleDTO updateSale(Long id, SaleDTO saleDTO) {
 
-    throw new UnsupportedOperationException(
-            "Updating completed sales is not supported. Please cancel the sale and create a new one.");
+    throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED,
+            "Updating completed sales is not supported. Delete the sale and create a new one.");
 }
 }

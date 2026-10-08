@@ -1,6 +1,7 @@
 package com.smartshop.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -71,5 +72,16 @@ class CreditServiceImplTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> creditService.recordPayment(1L, BigDecimal.valueOf(21), "test"));
+    }
+
+    @Test
+    void returnsEmptyHistoryWhenCustomerHasNoCreditAccountYet() {
+        Customer customer = new Customer();
+        customer.setId(1L);
+
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(creditRepository.findByCustomer(customer)).thenReturn(Optional.empty());
+
+        assertTrue(creditService.getTransactionHistory(1L).isEmpty());
     }
 }

@@ -8,6 +8,11 @@ export function validateSaleForm(form, customer) {
     return "Choose valid sale items.";
   }
 
+  const productIds = form.saleItems.map((item) => String(item.productId));
+  if (new Set(productIds).size !== productIds.length) {
+    return "Each product can appear once per sale. Update its quantity on one line.";
+  }
+
   if (form.paymentMethod === "Credit" && (!form.customerId || !creditEnabled)) {
     return "Only a registered credit-enabled customer can use Credit payment.";
   }
