@@ -1,0 +1,63 @@
+package com.smartshop.backend.controller;
+
+import java.util.List;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+
+import com.smartshop.backend.dto.CreditDTO;
+import com.smartshop.backend.dto.CreditRequest;
+import com.smartshop.backend.dto.CreditTransactionDTO;
+import com.smartshop.backend.service.CreditService;
+
+@RestController
+@RequestMapping("/api/credits")
+public class CreditController {
+
+    private final CreditService creditService;
+
+    public CreditController(CreditService creditService) {
+        this.creditService = creditService;
+    }
+
+    @PostMapping("/purchase")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CreditDTO addCreditPurchase(@Valid @RequestBody CreditRequest request) {
+        return creditService.addCreditPurchase(
+                request.getCustomerId(),
+                request.getAmount(),
+                request.getRemarks()
+        );
+    }
+
+    @PostMapping("/payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CreditDTO recordPayment(@Valid @RequestBody CreditRequest request) {
+        return creditService.recordPayment(
+                request.getCustomerId(),
+                request.getAmount(),
+                request.getRemarks()
+        );
+    }
+
+    @GetMapping("/customer/{customerId}")
+    public CreditDTO getCreditByCustomer(@PathVariable Long customerId) {
+        return creditService.getCreditByCustomer(customerId);
+    }
+
+    @GetMapping
+    public List<CreditDTO> getAllCredits() {
+        return creditService.getAllCredits();
+    }
+
+    @GetMapping("/customer/{customerId}/history")
+    public List<CreditTransactionDTO> getTransactionHistory(@PathVariable Long customerId) {
+        return creditService.getTransactionHistory(customerId);
+    }
+}

@@ -1,0 +1,36 @@
+package com.smartshop.backend.repository;
+
+import com.smartshop.backend.entity.Sale;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.math.BigDecimal;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface SaleRepository extends JpaRepository<Sale, Long> {
+
+    List<Sale> findBySaleDate(LocalDate saleDate);
+
+    List<Sale> findBySaleDateBetween(LocalDate from, LocalDate to);
+
+    @Query("select coalesce(sum(s.totalAmount), 0) from Sale s where s.saleDate = :saleDate")
+    BigDecimal sumTotalAmountBySaleDate(@Param("saleDate") LocalDate saleDate);
+
+    @Query("select coalesce(sum(si.quantity * si.purchasePrice), 0) from SaleItem si where si.sale.saleDate = :saleDate")
+    BigDecimal sumCostOfGoodsSoldBySaleDate(@Param("saleDate") LocalDate saleDate);
+
+    @Query("select coalesce(sum(s.totalAmount), 0) from Sale s where s.saleDate between :from and :to")
+    BigDecimal sumTotalAmountByDateRange(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("select coalesce(sum(si.quantity * si.purchasePrice), 0) from SaleItem si where si.sale.saleDate between :from and :to")
+    BigDecimal sumCostOfGoodsSoldByDateRange(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("select coalesce(sum(s.totalAmount), 0) from Sale s")
+    BigDecimal sumTotalAmount();
+
+    @Query("select coalesce(sum(si.quantity * si.purchasePrice), 0) from SaleItem si")
+    BigDecimal sumCostOfGoodsSold();
+
+}
