@@ -27,7 +27,7 @@ public class DashboardService {
 
         DashboardDTO dashboard = new DashboardDTO();
 
-        dashboard.setTotalProducts(productRepository.count());
+        dashboard.setTotalProducts(productRepository.countActiveProducts());
         dashboard.setTotalCategories(categoryRepository.count());
         dashboard.setTotalCustomers(customerRepository.count());
 

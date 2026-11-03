@@ -100,6 +100,10 @@ for (SaleItemDTO itemDTO : saleDTO.getSaleItems()) {
     Product product = productRepository.findByIdForUpdate(itemDTO.getProductId())
             .orElseThrow(() -> new EntityNotFoundException("Product not found with id: " + itemDTO.getProductId()));
 
+    if (Boolean.FALSE.equals(product.getActive())) {
+        throw new IllegalArgumentException("Inactive products cannot be sold: " + product.getProductName());
+    }
+
     int availableQuantity = product.getQuantity() == null ? 0 : product.getQuantity();
     if (availableQuantity < itemDTO.getQuantity()) {
         throw new IllegalArgumentException(

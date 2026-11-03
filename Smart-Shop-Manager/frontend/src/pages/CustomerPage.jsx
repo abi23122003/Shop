@@ -129,7 +129,7 @@ export default function CustomerPage() {
     setCustomerSaving(true);
     setCustomerError("");
     try {
-      const payload = { ...customerForm, phone, creditLimit: limit, creditEnabled: true, active: true };
+      const payload = { ...customerForm, phone, creditLimit: limit, creditEnabled: limit > 0, active: true };
       if (editing) await api.put(`/customers/${editing.id}`, payload);
       else await api.post("/customers", payload);
       setCustomerDialog(false);

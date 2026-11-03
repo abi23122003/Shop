@@ -22,6 +22,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 @Query("SELECT p FROM Product p WHERE p.id = :id")
 Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
+@Query("SELECT COUNT(p) FROM Product p WHERE COALESCE(p.active, true) = true")
+long countActiveProducts();
+
+@Query("SELECT p FROM Product p WHERE COALESCE(p.active, true) = true")
+List<Product> findActiveProducts();
+
+@Query(value = "SELECT p FROM Product p WHERE COALESCE(p.active, true) = true",
+        countQuery = "SELECT COUNT(p) FROM Product p WHERE COALESCE(p.active, true) = true")
+Page<Product> findAllActiveProducts(Pageable pageable);
+
 Optional<Product> findByBarcode(String barcode);
 List<Product> findByProductNameContainingIgnoreCase(String keyword);
 Page<Product> findByProductNameContainingIgnoreCase(
@@ -30,13 +40,13 @@ Page<Product> findByProductNameContainingIgnoreCase(
 @Query("SELECT p FROM Product p WHERE p.quantity <= p.minimumStock")
 List<Product> findLowStockProducts();
 List<Product> findByExpiryDateBefore(LocalDate date);
-@Query("SELECT COUNT(p) FROM Product p WHERE p.quantity <= p.minimumStock")
+@Query("SELECT COUNT(p) FROM Product p WHERE COALESCE(p.active, true) = true AND p.quantity <= p.minimumStock")
 long countLowStockProducts();
 @Query("SELECT COUNT(p) FROM Product p WHERE p.quantity = 0")
 long countOutOfStockProducts();
 @Query("SELECT COUNT(p) FROM Product p WHERE p.expiryDate <= :date")
 long countExpiringProducts(@Param("date") LocalDate date);
-@Query("SELECT SUM(p.sellingPrice * p.quantity) FROM Product p")
+@Query("SELECT COALESCE(SUM(p.sellingPrice * p.quantity), 0) FROM Product p WHERE COALESCE(p.active, true) = true")
 BigDecimal getTotalInventoryValue();
 @Query("""
     SELECT new com.smartshop.backend.dto.ChartDataDTO(
@@ -44,6 +54,7 @@ BigDecimal getTotalInventoryValue();
         p.quantity
     )
     FROM Product p
+    WHERE COALESCE(p.active, true) = true
     ORDER BY p.quantity DESC
 """)
 List<ChartDataDTO> getStockChartData();
@@ -53,6 +64,7 @@ List<ChartDataDTO> getStockChartData();
         (p.sellingPrice * p.quantity)
     )
     FROM Product p
+    WHERE COALESCE(p.active, true) = true
     ORDER BY (p.sellingPrice * p.quantity) DESC
 """)
 List<ChartDataDTO> getInventoryValueChartData();

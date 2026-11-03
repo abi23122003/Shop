@@ -79,9 +79,10 @@ public String deleteCustomer(Long id) {
     Customer customer = customerRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Customer not found with id: " + id));
 
-    customerRepository.delete(customer);
+    customer.setActive(false);
+    customerRepository.save(customer);
 
-    return "Customer deleted successfully!";
+    return "Customer deactivated successfully!";
 }
 // Search Customers
 public List<CustomerDTO> searchCustomers(String keyword) {

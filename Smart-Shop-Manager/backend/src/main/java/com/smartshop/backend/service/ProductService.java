@@ -3,6 +3,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -17,10 +18,13 @@ import com.smartshop.backend.dto.ProductRestockRequest;
 import com.smartshop.backend.dto.ProductStatisticsDTO;
 import com.smartshop.backend.entity.Category;
 import com.smartshop.backend.entity.Product;
+import com.smartshop.backend.entity.StockMovement;
 import com.smartshop.backend.mapper.ProductMapper;
 import com.smartshop.backend.repository.CategoryRepository;
 import com.smartshop.backend.repository.ProductRepository;
+import com.smartshop.backend.repository.StockMovementRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProductService {
@@ -29,6 +33,8 @@ public class ProductService {
     private ProductRepository productRepository;
     @Autowired
     private CategoryRepository categoryRepository;
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
 
  public ProductDTO saveProduct(ProductDTO productDTO) {
 
@@ -47,12 +53,13 @@ public class ProductService {
 }
 
 public List<ProductDTO> getAllProducts() {
-    List<Product> products = productRepository.findAll();
+    List<Product> products = productRepository.findActiveProducts();
     return products.stream()
             .map(ProductMapper::toDTO)
             .toList();
 }
 
+@Transactional
 public ProductDTO restockProduct(ProductRestockRequest request) {
     String barcode = request.getBarcode().trim();
     Product product = productRepository.findByBarcode(barcode)
@@ -61,7 +68,16 @@ public ProductDTO restockProduct(ProductRestockRequest request) {
     int currentQuantity = product.getQuantity() == null ? 0 : product.getQuantity();
     product.setQuantity(currentQuantity + request.getQuantity());
 
-    return ProductMapper.toDTO(productRepository.save(product));
+    Product savedProduct = productRepository.save(product);
+    StockMovement movement = new StockMovement();
+    movement.setProduct(savedProduct);
+    movement.setType("RESTOCK");
+    movement.setQuantity(request.getQuantity());
+    movement.setMovedAt(LocalDateTime.now());
+    movement.setRemarks("Restock");
+    stockMovementRepository.save(movement);
+
+    return ProductMapper.toDTO(savedProduct);
 }
 
 public List<ProductDTO> searchProducts(String keyword) {
@@ -75,7 +91,7 @@ public List<ProductDTO> searchProducts(String keyword) {
 public Page<ProductDTO> getProductsByPage(int page, int size) {
 
     Page<Product> products =
-            productRepository.findAll(PageRequest.of(page, size));
+            productRepository.findAllActiveProducts(PageRequest.of(page, size));
 
     return products.map(ProductMapper::toDTO);
 }
@@ -134,7 +150,7 @@ public List<ProductDTO> getExpiringProducts(LocalDate date) {
 }
 public ProductStatisticsDTO getProductStatistics() {
 
-    long totalProducts = productRepository.count();
+    long totalProducts = productRepository.countActiveProducts();
 
     long lowStockProducts = productRepository.countLowStockProducts();
 

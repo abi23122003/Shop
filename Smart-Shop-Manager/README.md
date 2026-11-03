@@ -46,6 +46,17 @@ $env:JWT_SECRET="your_secure_256_bit_jwt_secret_key_here_12345"
 .\mvnw.cmd spring-boot:run
 ```
 
+Keep the backend terminal running. Verify it is available before opening the
+frontend:
+
+```text
+http://localhost:8081/actuator/health
+```
+
+On Windows, `backend\run-local.cmd` performs the Java and MySQL checks and
+starts the same service. It prompts for `DB_PASSWORD` unless that variable is
+already set.
+
 ### Frontend (React + Vite)
 
 ```bash
