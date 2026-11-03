@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/Delete";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
@@ -10,6 +10,7 @@ import { productLabel } from "../modules/products/productLabel";
 import { buildSalePayload, validateSaleForm } from "../modules/sales/saleWorkflow";
 import { formatDateOnly, isDateOnlyInRange, parseDateOnly } from "../utils/dateUtils";
 import { getApiErrorMessage } from "../services/apiErrors";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 
 const PAGE_SIZE = 20;
 const today = () => formatDateOnly();
@@ -36,8 +37,10 @@ export default function SalePage() {
   const customerById = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const customerLabel = (sale) => sale.customerId ? (customerById.get(sale.customerId)?.customerName ?? `Customer #${sale.customerId}`) : "Walk-in Customer";
-  async function load() { setLoading(true); try { const [saleData, customerData, productData] = await Promise.all([getSales(), getCustomers(), getProducts()]); setSales(saleData); setCustomers(customerData); setProducts(productData); setError(""); } catch (requestError) { setError(errorMessage(requestError)); } finally { setLoading(false); } }
-  useEffect(() => { const timer = setTimeout(load, 0); return () => clearTimeout(timer); }, []);
+  const load = useCallback(async () => { setLoading(true); try { const [saleData, customerData, productData] = await Promise.all([getSales(), getCustomers(), getProducts()]); setSales(saleData); setCustomers(customerData); setProducts(productData); setError(""); } catch (requestError) { setError(errorMessage(requestError)); } finally { setLoading(false); } }, []);
+  const refreshSalesAndProducts = useCallback(async () => { try { const [saleData, productData] = await Promise.all([getSales(), getProducts()]); setSales(saleData); setProducts(productData); } catch {} }, []);
+  useEffect(() => { const timer = setTimeout(load, 0); return () => clearTimeout(timer); }, [load]);
+  useAutoRefresh(async () => { if (open || details || reversalTarget) return; await refreshSalesAndProducts(); });
   function resetForm() { setForm({ saleDate: today(), customerId: "", paymentMethod: "Cash", saleItems: [blankItem] }); }
   function selectCustomer(customerId) { const customer = customerById.get(Number(customerId)); const creditEnabled = customer?.creditEnabled ?? Number(customer?.creditLimit ?? 0) > 0; setForm((current) => ({ ...current, customerId, paymentMethod: creditEnabled ? current.paymentMethod : "Cash" })); }
   function updateItem(index, key, value) { const numeric = ["productId", "quantity", "sellingPrice"].includes(key); setForm((current) => ({ ...current, saleItems: current.saleItems.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: numeric && value !== "" ? Number(value) : value } : item) })); }
