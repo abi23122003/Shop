@@ -47,6 +47,10 @@ public class SaleMapper {
         dto.setSaleDate(sale.getSaleDate());
         dto.setPaymentMethod(sale.getPaymentMethod());
         dto.setTotalAmount(sale.getTotalAmount());
+        dto.setStatus(sale.getStatus());
+        dto.setReversalReason(sale.getReversalReason());
+        dto.setReversedAt(sale.getReversedAt());
+        dto.setReversedBy(sale.getReversedBy());
 
         if (sale.getCustomer() != null) {
             dto.setCustomerId(sale.getCustomer().getId());

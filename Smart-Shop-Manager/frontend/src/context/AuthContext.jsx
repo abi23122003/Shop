@@ -3,6 +3,17 @@ import { login as loginRequest } from "../services/authService";
 import { tokenStorage } from "../services/storage/tokenStorage";
 import { AuthContext } from "./authContextValue";
 
+function usernameFromToken(token) {
+  if (!token) return "";
+  try {
+    const payload = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = payload?.padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return paddedPayload ? JSON.parse(atob(paddedPayload)).sub ?? "" : "";
+  } catch {
+    return "";
+  }
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => tokenStorage.get());
 
@@ -27,6 +38,7 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener("smart-shop-session-expired", handleSessionExpired);
   }, [logout]);
 
-  const value = useMemo(() => ({ token, isAuthenticated: Boolean(token), login, logout }), [token, login, logout]);
+  const username = useMemo(() => usernameFromToken(token), [token]);
+  const value = useMemo(() => ({ token, username, isAuthenticated: Boolean(token), login, logout }), [token, username, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

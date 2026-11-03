@@ -147,7 +147,7 @@ export default function Login() {
                 letterSpacing: 3.5,
                 fontWeight: 700,
                 fontSize: { xs: "0.8rem", sm: "0.85rem" },
-                color: "#bfdbfe",
+                color: "#ffffff",
                 display: "block",
                 lineHeight: 1.2,
               }}
@@ -248,6 +248,7 @@ export default function Login() {
               helperText={fieldErrors.password}
               fullWidth
               disabled={isSubmitting}
+              sx={{ "& input::-ms-reveal, & input::-ms-clear": { display: "none" } }}
               slotProps={{
                 input: {
                   endAdornment: (
@@ -257,7 +258,6 @@ export default function Login() {
                         onClick={() => setShowPassword((prev) => !prev)}
                         edge="end"
                         size="small"
-                        tabIndex={-1}
                       >
                         {showPassword ? (
                           <VisibilityOffOutlinedIcon fontSize="small" />

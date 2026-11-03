@@ -3,8 +3,10 @@ package com.smartshop.backend.entity;
 import java.time.LocalDate;
 import java.util.List;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -44,6 +46,16 @@ public class Sale {
     private String paymentMethod;
 
     private BigDecimal totalAmount;
+
+    @Column(length = 32, nullable = false)
+    private String status = "COMPLETED";
+
+    @Column(length = 512)
+    private String reversalReason;
+
+    private LocalDateTime reversedAt;
+
+    private String reversedBy;
 
     @OneToMany(
             mappedBy = "sale",

@@ -3,7 +3,8 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
 import MessageOutlinedIcon from "@mui/icons-material/MessageOutlined";
-import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import api from "../services/api";
 import { getApiErrorMessage } from "../services/apiErrors";
 import { formatDateOnly } from "../utils/dateUtils";
@@ -77,7 +78,7 @@ export default function CustomerPage() {
 
   const creditCustomers = useMemo(() => customers.map((customer) => {
     const account = credits.find((entry) => Number(entry.customerId) === Number(customer.id));
-    const customerCreditSales = sales.filter((sale) => Number(sale.customerId) === Number(customer.id) && String(sale.paymentMethod).toLowerCase() === "credit");
+    const customerCreditSales = sales.filter((sale) => Number(sale.customerId) === Number(customer.id) && String(sale.paymentMethod).toLowerCase() === "credit" && sale.status !== "REVERSED");
     const balance = amountOf(account?.balance);
     return { ...customer, credit: account, balance, customerCreditSales, isCreditCustomer: Boolean(customer.creditEnabled) || customerCreditSales.length > 0 || balance > 0 };
   }).filter((customer) => customer.isCreditCustomer), [customers, credits, sales]);
@@ -259,9 +260,13 @@ export default function CustomerPage() {
     {loadError && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void load()}>Retry</Button>}>{loadError}</Alert>}
     <Card><CardContent><Typography color="text.secondary">You will get</Typography><Typography variant="h4" color="error.main">{money(totalOwed)}</Typography></CardContent></Card>
     <TextField fullWidth label="Search name or phone" value={search} onChange={(event) => setSearch(event.target.value)} />
-    {loading ? <Box sx={{ display: "grid", placeItems: "center", minHeight: 160 }}><CircularProgress /></Box> : <Stack spacing={1.5}>{visibleCustomers.map((customer) => <Paper key={customer.id} variant="outlined" sx={{ p: 2, cursor: "pointer" }} onClick={() => void openLedger(customer)}>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography fontWeight={650}>{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography></Box><Typography color={customer.balance > 0 ? "error.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></Stack>
-    </Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}><Typography color="text.secondary">{creditCustomers.length ? "No credit customers match your search." : "No credit customers yet. Add one to start a ledger."}</Typography></Paper>}</Stack>}
+    {loading ? <Box sx={{ display: "grid", placeItems: "center", minHeight: 160 }}><CircularProgress /></Box> : <>
+      <Paper sx={{ display: { xs: "none", md: "block" }, overflowX: "auto" }}><Table><TableHead><TableRow><TableCell>Customer</TableCell><TableCell>Phone</TableCell><TableCell>Credit limit</TableCell><TableCell align="right">Balance</TableCell><TableCell align="right">Actions</TableCell></TableRow></TableHead><TableBody>
+        {visibleCustomers.map((customer) => <TableRow key={customer.id} hover><TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Typography fontWeight={650}>{customer.customerName}</Typography></Stack></TableCell><TableCell>{customer.phone}</TableCell><TableCell>{customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</TableCell><TableCell align="right"><Typography color={customer.balance > 0 ? "error.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></TableCell><TableCell align="right"><Button size="small" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></TableCell></TableRow>)}
+        {!visibleCustomers.length && <TableRow><TableCell colSpan={5} align="center">{creditCustomers.length ? "No credit customers match your search." : "No credit customers yet. Add one to start a ledger."}</TableCell></TableRow>}
+      </TableBody></Table></Paper>
+      <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" } }}>{visibleCustomers.map((customer, index) => <Paper key={customer.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography variant="subtitle2">Customer #{index + 1}</Typography><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="h6">{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography></Box></Stack><Stack direction="row" sx={{ justifyContent: "space-between" }}><Typography variant="body2" color="text.secondary">Balance</Typography><Typography fontWeight={700} color={customer.balance > 0 ? "error.main" : "success.main"}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></Stack><Typography variant="body2" color="text.secondary">Credit limit: {customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</Typography><Stack direction="row" spacing={1}><Button size="small" variant="outlined" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></Stack></Stack></Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>{creditCustomers.length ? "No credit customers match your search." : "No credit customers yet. Add one to start a ledger."}</Paper>}</Stack>
+    </>}
 
     <Dialog open={Boolean(selected) && !customerDialog && !purchaseDialog && !paymentDialog} onClose={() => setSelected(null)} fullWidth maxWidth="md">
       <DialogTitle><Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => setSelected(null)}>Back</Button><Typography variant="h6" component="span" sx={{ ml: 1 }}>{selected?.customerName} ledger</Typography></DialogTitle>

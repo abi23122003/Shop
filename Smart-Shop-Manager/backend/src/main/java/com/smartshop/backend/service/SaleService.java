@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +19,17 @@ import com.smartshop.backend.entity.Customer;
 import com.smartshop.backend.entity.Product;
 import com.smartshop.backend.entity.Sale;
 import com.smartshop.backend.entity.SaleItem;
+import com.smartshop.backend.entity.StockMovement;
 import com.smartshop.backend.mapper.SaleMapper;
 import com.smartshop.backend.repository.CreditRepository;
 import com.smartshop.backend.repository.CreditTransactionRepository;
 import com.smartshop.backend.repository.CustomerRepository;
 import com.smartshop.backend.repository.ProductRepository;
 import com.smartshop.backend.repository.SaleRepository;
+import com.smartshop.backend.repository.StockMovementRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 
 @Service
@@ -35,19 +40,22 @@ public class SaleService {
     private final ProductRepository productRepository;
     private final CreditRepository creditRepository;
     private final CreditTransactionRepository creditTransactionRepository;
+    private final StockMovementRepository stockMovementRepository;
 
     public SaleService(
             SaleRepository saleRepository,
             CustomerRepository customerRepository,
             ProductRepository productRepository,
             CreditRepository creditRepository,
-            CreditTransactionRepository creditTransactionRepository) {
+            CreditTransactionRepository creditTransactionRepository,
+            StockMovementRepository stockMovementRepository) {
 
         this.saleRepository = saleRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
         this.creditRepository = creditRepository;
         this.creditTransactionRepository = creditTransactionRepository;
+        this.stockMovementRepository = stockMovementRepository;
     }
     @Transactional
 public SaleDTO saveSale(SaleDTO saleDTO) {
@@ -125,6 +133,17 @@ sale.setTotalAmount(totalAmount);
 
 Sale savedSale = saleRepository.save(sale);
 
+for (SaleItem saleItem : saleItems) {
+    StockMovement movement = new StockMovement();
+    movement.setProduct(saleItem.getProduct());
+    movement.setSale(savedSale);
+    movement.setType("SALE");
+    movement.setQuantity(saleItem.getQuantity());
+    movement.setMovedAt(LocalDateTime.now());
+    movement.setRemarks("Sale " + savedSale.getSaleCode());
+    stockMovementRepository.save(movement);
+}
+
  if ("Credit".equalsIgnoreCase(paymentMethod)) {
     Credit credit = creditRepository.findByCustomerForUpdate(customer).orElseGet(() -> {
         Credit created = new Credit();
@@ -187,31 +206,69 @@ public SaleDTO getSaleById(Long id) {
 }
 @Transactional
 public void deleteSale(Long id) {
+    reverseSale(id, "Sale reversed");
+}
+
+@Transactional
+public void reverseSale(Long id, String reason) {
 
     Sale sale = saleRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Sale not found with id: " + id));
 
+    if ("REVERSED".equalsIgnoreCase(sale.getStatus())) {
+        throw new IllegalStateException("Sale has already been reversed");
+    }
+
+    LocalDateTime reversedAt = LocalDateTime.now();
+    String reversalReason = reason == null || reason.isBlank() ? "Sale reversed" : reason.trim();
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String reversedBy = authentication == null || !authentication.isAuthenticated()
+            ? "system"
+            : authentication.getName();
+
     for (SaleItem saleItem : sale.getSaleItems()) {
         Product product = saleItem.getProduct();
-        product.setQuantity(product.getQuantity() + saleItem.getQuantity());
+        int currentQuantity = product.getQuantity() == null ? 0 : product.getQuantity();
+        product.setQuantity(currentQuantity + saleItem.getQuantity());
         productRepository.save(product);
+
+        StockMovement movement = new StockMovement();
+        movement.setProduct(product);
+        movement.setSale(sale);
+        movement.setType("REVERSAL");
+        movement.setQuantity(saleItem.getQuantity());
+        movement.setMovedAt(reversedAt);
+        movement.setRemarks("Sale reversal " + sale.getSaleCode() + ": " + reversalReason);
+        stockMovementRepository.save(movement);
     }
 
     if ("Credit".equalsIgnoreCase(sale.getPaymentMethod()) && sale.getCustomer() != null) {
         creditRepository.findByCustomer(sale.getCustomer()).ifPresent(credit -> {
-            BigDecimal updatedBalance = valueOrZero(credit.getBalance())
-                    .subtract(valueOrZero(sale.getTotalAmount())).max(BigDecimal.ZERO);
-            BigDecimal updatedTotalCredit = valueOrZero(credit.getTotalCredit())
-                    .subtract(valueOrZero(sale.getTotalAmount())).max(BigDecimal.ZERO);
+            CreditTransaction reversal = new CreditTransaction();
+            reversal.setCredit(credit);
+            reversal.setSale(sale);
+            reversal.setTransactionDate(reversedAt.toLocalDate());
+            reversal.setType("REVERSAL");
+            reversal.setAmount(valueOrZero(sale.getTotalAmount()).negate());
+            reversal.setRemarks("Reversal of credit sale " + sale.getSaleCode() + ": " + reversalReason);
+            creditTransactionRepository.save(reversal);
+
+            BigDecimal updatedBalance = valueOrZero(creditTransactionRepository.calculateBalance(credit));
+            BigDecimal updatedTotalPaid = valueOrZero(creditTransactionRepository.calculateTotalPaid(credit));
+            BigDecimal updatedTotalCredit = valueOrZero(creditTransactionRepository.calculateTotalCredit(credit));
             credit.setBalance(updatedBalance);
+            credit.setTotalPaid(updatedTotalPaid);
             credit.setTotalCredit(updatedTotalCredit);
-            credit.setStatus(updatedBalance.signum() == 0 ? "PAID" : "PENDING");
+            credit.setStatus(updatedBalance.signum() <= 0 ? "PAID" : "PENDING");
             creditRepository.save(credit);
         });
-        creditTransactionRepository.deleteBySale(sale);
     }
 
-    saleRepository.delete(sale);
+    sale.setStatus("REVERSED");
+    sale.setReversalReason(reversalReason);
+    sale.setReversedAt(reversedAt);
+    sale.setReversedBy(reversedBy);
+    saleRepository.save(sale);
 }
 public SaleDTO updateSale(Long id, SaleDTO saleDTO) {
 

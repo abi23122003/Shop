@@ -4,6 +4,7 @@ export default createTheme({
   palette: {
     primary: { main: "#1d4ed8" },
     secondary: { main: "#0f766e" },
+    dashboard: { products: "#1565c0", categories: "#7b1fa2", customers: "#00695c", sales: "#2e7d32" },
     background: { default: "#eef3fb", paper: "#ffffff" },
     text: { primary: "#0f172a", secondary: "#475569" },
   },

@@ -38,6 +38,7 @@ public class ReportService {
                 ? saleRepository.findAll()
                 : saleRepository.findBySaleDateBetween(from, to);
         return sales.stream()
+                .filter(sale -> !"REVERSED".equalsIgnoreCase(sale.getStatus()))
                 .map(this::convertToDTO)
                 .toList();
     }

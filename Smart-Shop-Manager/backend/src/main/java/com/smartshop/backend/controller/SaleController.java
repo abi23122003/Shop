@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.smartshop.backend.dto.SaleDTO;
@@ -69,8 +70,8 @@ public class SaleController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    public void deleteSale(@PathVariable Long id) {
-        saleService.deleteSale(id);
+    public void deleteSale(@PathVariable Long id, @RequestParam(required = false) String reason) {
+        saleService.reverseSale(id, reason);
     }
 
     @GetMapping("/{id}/invoice")
