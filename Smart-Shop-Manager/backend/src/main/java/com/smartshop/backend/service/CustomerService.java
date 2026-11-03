@@ -12,15 +12,19 @@ import com.smartshop.backend.dto.CustomerDTO;
 import com.smartshop.backend.dto.CustomerStatisticsDTO;
 import com.smartshop.backend.entity.Customer;
 import com.smartshop.backend.mapper.CustomerMapper;
+import com.smartshop.backend.repository.CreditRepository;
 import com.smartshop.backend.repository.CustomerRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
 @Service
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final CreditRepository creditRepository;
 
-    public CustomerService(CustomerRepository customerRepository) {
+    public CustomerService(CustomerRepository customerRepository, CreditRepository creditRepository) {
         this.customerRepository = customerRepository;
+        this.creditRepository = creditRepository;
     }
 
     // Save Customer
@@ -39,7 +43,7 @@ public class CustomerService {
     // Get All Customers
     public List<CustomerDTO> getAllCustomers() {
 
-        return customerRepository.findAll()
+        return customerRepository.findAllActiveCustomers()
                 .stream()
                 .map(CustomerMapper::toDTO)
                 .collect(Collectors.toList());
@@ -78,6 +82,13 @@ public String deleteCustomer(Long id) {
 
     Customer customer = customerRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Customer not found with id: " + id));
+
+    BigDecimal balance = creditRepository.findByCustomer(customer)
+            .map(credit -> credit.getBalance() == null ? BigDecimal.ZERO : credit.getBalance())
+            .orElse(BigDecimal.ZERO);
+    if (balance.signum() > 0) {
+        throw new IllegalArgumentException("Cannot remove customer while the outstanding balance is " + balance);
+    }
 
     customer.setActive(false);
     customerRepository.save(customer);

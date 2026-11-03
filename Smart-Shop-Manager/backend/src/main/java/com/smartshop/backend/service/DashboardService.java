@@ -29,7 +29,7 @@ public class DashboardService {
 
         dashboard.setTotalProducts(productRepository.countActiveProducts());
         dashboard.setTotalCategories(categoryRepository.count());
-        dashboard.setTotalCustomers(customerRepository.count());
+        dashboard.setTotalCustomers(customerRepository.countActiveCustomers());
 
         BigDecimal todaySales = saleRepository.sumTotalAmountBySaleDate(LocalDate.now());
         dashboard.setTodaySales(todaySales == null ? BigDecimal.ZERO : todaySales);

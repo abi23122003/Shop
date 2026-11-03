@@ -47,7 +47,40 @@ export default createTheme({
     },
     MuiButton: {
       styleOverrides: {
-        root: { borderRadius: 12 },
+        root: {
+          borderRadius: 12,
+          minHeight: 44,
+          "&:focus-visible": {
+            outline: "3px solid",
+            outlineColor: "primary.main",
+            outlineOffset: 2,
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          minWidth: 44,
+          minHeight: 44,
+          "&:focus-visible": {
+            outline: "3px solid",
+            outlineColor: "primary.main",
+            outlineOffset: 2,
+          },
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          minHeight: 44,
+          "&:focus-visible": {
+            outline: "3px solid",
+            outlineColor: "primary.main",
+            outlineOffset: 2,
+          },
+        },
       },
     },
   },

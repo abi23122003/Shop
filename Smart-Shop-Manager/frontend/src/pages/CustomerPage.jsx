@@ -4,13 +4,14 @@ import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
 import MessageOutlinedIcon from "@mui/icons-material/MessageOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import api from "../services/api";
 import { getApiErrorMessage } from "../services/apiErrors";
 import { formatDateOnly } from "../utils/dateUtils";
 
 const money = (value) => `Rs ${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const blankCustomer = { customerName: "", phone: "", email: "", address: "", creditLimit: "" };
+const SMALL_LIMIT = 1000;
 const messageFor = (error, fallback) => getApiErrorMessage(error, fallback);
 const amountOf = (value) => Number(value ?? 0);
 
@@ -27,12 +28,27 @@ function blurActiveElement() {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 }
 
+function customerType(customer) {
+  const limit = amountOf(customer.creditLimit);
+  if (!customer.creditEnabled || limit === 0) return "instant";
+  if (limit <= SMALL_LIMIT) return "sometimes";
+  return "credit";
+}
+
+function CustomerTypeTag({ customer }) {
+  const type = customerType(customer);
+  const tags = { credit: ["Credit", "primary"], sometimes: ["Sometimes pays", "warning"], instant: ["Pays instantly", "success"] };
+  const [label, color] = tags[type];
+  return <Chip label={label} color={color} size="small" />;
+}
+
 export default function CustomerPage() {
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [credits, setCredits] = useState([]);
   const [search, setSearch] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState(null);
@@ -42,6 +58,7 @@ export default function CustomerPage() {
   const [customerDialog, setCustomerDialog] = useState(false);
   const [editing, setEditing] = useState(null);
   const [customerForm, setCustomerForm] = useState(blankCustomer);
+  const [formCustomerType, setFormCustomerType] = useState("instant");
   const [customerError, setCustomerError] = useState("");
   const [customerSaving, setCustomerSaving] = useState(false);
   const [purchaseDialog, setPurchaseDialog] = useState(false);
@@ -76,18 +93,24 @@ export default function CustomerPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const creditCustomers = useMemo(() => customers.map((customer) => {
+  const customersWithCredit = useMemo(() => customers.filter((customer) => customer.active !== false).map((customer) => {
     const account = credits.find((entry) => Number(entry.customerId) === Number(customer.id));
-    const customerCreditSales = sales.filter((sale) => Number(sale.customerId) === Number(customer.id) && String(sale.paymentMethod).toLowerCase() === "credit" && sale.status !== "REVERSED");
+    const customerSales = sales.filter((sale) => Number(sale.customerId) === Number(customer.id));
     const balance = amountOf(account?.balance);
-    return { ...customer, credit: account, balance, customerCreditSales, isCreditCustomer: Boolean(customer.creditEnabled) || customerCreditSales.length > 0 || balance > 0 };
-  }).filter((customer) => customer.isCreditCustomer), [customers, credits, sales]);
+    return { ...customer, credit: account, balance, customerSales };
+  }), [customers, credits, sales]);
 
   const visibleCustomers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return creditCustomers.filter((customer) => !query || `${customer.customerName} ${customer.phone}`.toLowerCase().includes(query));
-  }, [creditCustomers, search]);
-  const totalOwed = creditCustomers.reduce((sum, customer) => sum + customer.balance, 0);
+    return customersWithCredit.filter((customer) => (!query || `${customer.customerName} ${customer.phone}`.toLowerCase().includes(query)) && (customerFilter === "all" || customerType(customer) === customerFilter));
+  }, [customersWithCredit, customerFilter, search]);
+  // Summary uses the same tab-and-search result as the customer list.
+  const totalOwed = visibleCustomers.reduce((sum, customer) => sum + customer.balance, 0);
+  const customerCounts = visibleCustomers.reduce((counts, customer) => {
+    counts[customerType(customer)] += 1;
+    return counts;
+  }, { credit: 0, sometimes: 0, instant: 0 });
+  const selectedCount = customerCounts[customerFilter];
 
   async function openLedger(customer) {
     blurActiveElement();
@@ -108,6 +131,7 @@ export default function CustomerPage() {
   function openCustomerForm(customer = null) {
     blurActiveElement();
     setEditing(customer);
+    setFormCustomerType(customer ? customerType(customer) : "instant");
     setCustomerForm(customer ? {
       ...blankCustomer,
       customerName: customer.customerName ?? "",
@@ -120,16 +144,31 @@ export default function CustomerPage() {
     setCustomerDialog(true);
   }
 
+  function chooseCustomerType(type) {
+    setFormCustomerType(type);
+    setCustomerForm((current) => {
+      if (type === "instant") return { ...current, creditLimit: "0" };
+      if (type === "sometimes") {
+        const limit = amountOf(current.creditLimit);
+        return { ...current, creditLimit: String(limit > 0 && limit <= SMALL_LIMIT ? limit : SMALL_LIMIT) };
+      }
+      return current;
+    });
+    setCustomerError("");
+  }
+
   async function saveCustomer(event) {
     event.preventDefault();
     const phone = customerForm.phone.replace(/\D/g, "");
     const limit = customerForm.creditLimit.trim() === "" ? 0 : Number(customerForm.creditLimit);
     if (!/^\d{10}$/.test(phone)) return setCustomerError("Phone number must contain exactly 10 digits.");
     if (!Number.isFinite(limit) || limit < 0) return setCustomerError("Credit limit must be zero or a positive amount.");
+    if (formCustomerType === "credit" && limit <= 0) return setCustomerError("Credit customers need a credit limit greater than Rs 0.");
+    if (formCustomerType === "sometimes" && (limit < 1 || limit > SMALL_LIMIT)) return setCustomerError(`Sometimes pays customers need a credit limit from Rs 1 to Rs ${SMALL_LIMIT}.`);
     setCustomerSaving(true);
     setCustomerError("");
     try {
-      const payload = { ...customerForm, phone, creditLimit: limit, creditEnabled: limit > 0, active: true };
+      const payload = { customerName: customerForm.customerName, phone, email: customerForm.email, address: customerForm.address, creditLimit: formCustomerType === "instant" ? 0 : limit, creditEnabled: formCustomerType !== "instant", active: true };
       if (editing) await api.put(`/customers/${editing.id}`, payload);
       else await api.post("/customers", payload);
       setCustomerDialog(false);
@@ -189,7 +228,7 @@ export default function CustomerPage() {
           ...previous,
           balance: amountOf(refreshedAccount?.balance),
           credit: refreshedAccount,
-          customerCreditSales: refreshedSales.filter((sale) => Number(sale.customerId) === Number(selected.id) && String(sale.paymentMethod).toLowerCase() === "credit"),
+          customerSales: refreshedSales.filter((sale) => Number(sale.customerId) === Number(selected.id)),
         } : previous);
         setLedgerError("");
       } catch (refreshError) {
@@ -228,13 +267,25 @@ export default function CustomerPage() {
     }
   }
 
+  async function removeCustomer() {
+    if (!selected || !window.confirm("Remove this customer? Their history is kept.")) return;
+    setLedgerError("");
+    try {
+      await api.delete(`/customers/${selected.id}`);
+      setSelected(null);
+      await load();
+    } catch (error) {
+      setLedgerError(error.response?.data?.message ?? messageFor(error, "Could not remove this customer."));
+    }
+  }
+
   const ledgerGroups = useMemo(() => {
     if (!selected) return [];
     const entries = [];
-    selected.customerCreditSales.forEach((sale) => {
+    selected.customerSales.forEach((sale) => {
       (sale.saleItems ?? []).forEach((item) => {
         const itemProduct = products.find((entry) => Number(entry.id) === Number(item.productId));
-        entries.push({ date: sale.saleDate, kind: "purchase", id: `${sale.id}-${item.id ?? item.productId}`, label: `${itemProduct?.productName ?? `Product #${item.productId}`} x ${item.quantity}`, amount: amountOf(item.totalPrice ?? amountOf(item.sellingPrice) * amountOf(item.quantity)) });
+        entries.push({ date: sale.saleDate, kind: "purchase", id: `${sale.id}-${item.id ?? item.productId}`, label: `${itemProduct?.productName ?? `Product #${item.productId}`} x ${item.quantity} · ${sale.paymentMethod || "Cash"}${sale.status === "REVERSED" ? " · Reversed" : ""}`, amount: amountOf(item.totalPrice ?? amountOf(item.sellingPrice) * amountOf(item.quantity)), reversed: sale.status === "REVERSED" });
       });
     });
     history.filter((entry) => String(entry.type).toUpperCase() === "PAYMENT").forEach((entry) => {
@@ -254,18 +305,21 @@ export default function CustomerPage() {
 
   return <Stack spacing={3}>
     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}>
-      <Box><Typography variant="h4">Credit customers</Typography><Typography color="text.secondary">Track customer purchases and payments in one ledger.</Typography></Box>
-      <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={() => openCustomerForm()}>Add credit customer</Button>
+      <Box><Typography variant="h4">Customers</Typography><Typography color="text.secondary">Track customer purchases and payments in one ledger.</Typography></Box>
+      <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={() => openCustomerForm()}>Add customer</Button>
     </Stack>
     {loadError && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void load()}>Retry</Button>}>{loadError}</Alert>}
-    <Card><CardContent><Typography color="text.secondary">You will get</Typography><Typography variant="h4" color="error.main">{money(totalOwed)}</Typography></CardContent></Card>
+    <Card><CardContent><Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "space-between" }}>
+      {customerFilter === "all" ? <><Box><Typography color="text.secondary">You will get</Typography><Typography variant="h4" color="error.main">{money(totalOwed)}</Typography></Box><Stack direction="row" spacing={{ xs: 2, sm: 3 }}><Box><Typography color="text.secondary">Credit</Typography><Typography variant="h5" color="primary.main">{customerCounts.credit}</Typography></Box><Box><Typography color="text.secondary">Sometimes pays</Typography><Typography variant="h5" color="warning.main">{customerCounts.sometimes}</Typography></Box><Box><Typography color="text.secondary">Pays instantly</Typography><Typography variant="h5" color="success.main">{customerCounts.instant}</Typography></Box></Stack></> : <Box><Typography color="text.secondary">{customerFilter === "credit" ? "Credit" : customerFilter === "sometimes" ? "Sometimes pays" : "Pays instantly"} customers</Typography><Typography variant="h4" color="primary.main">{selectedCount}</Typography><Typography color="text.secondary">{money(customerFilter === "instant" ? 0 : totalOwed)} owed</Typography></Box>}
+    </Stack></CardContent></Card>
     <TextField fullWidth label="Search name or phone" value={search} onChange={(event) => setSearch(event.target.value)} />
+    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>{[["all", "All"], ["credit", "Credit"], ["sometimes", "Sometimes pays"], ["instant", "Pays instantly"]].map(([value, label]) => <Box key={value} component="button" type="button" aria-pressed={customerFilter === value} onClick={() => setCustomerFilter(value)} sx={{ minHeight: 44, px: 2, border: 1, borderRadius: 5, borderColor: customerFilter === value ? "primary.main" : "divider", bgcolor: customerFilter === value ? "primary.main" : "background.paper", color: customerFilter === value ? "primary.contrastText" : "text.primary", cursor: "pointer", font: "inherit" }}>{label}</Box>)}</Stack>
     {loading ? <Box sx={{ display: "grid", placeItems: "center", minHeight: 160 }}><CircularProgress /></Box> : <>
       <Paper sx={{ display: { xs: "none", md: "block" }, overflowX: "auto" }}><Table><TableHead><TableRow><TableCell>Customer</TableCell><TableCell>Phone</TableCell><TableCell>Credit limit</TableCell><TableCell align="right">Balance</TableCell><TableCell align="right">Actions</TableCell></TableRow></TableHead><TableBody>
-        {visibleCustomers.map((customer) => <TableRow key={customer.id} hover><TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Typography fontWeight={650}>{customer.customerName}</Typography></Stack></TableCell><TableCell>{customer.phone}</TableCell><TableCell>{customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</TableCell><TableCell align="right"><Typography color={customer.balance > 0 ? "error.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></TableCell><TableCell align="right"><Button size="small" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></TableCell></TableRow>)}
-        {!visibleCustomers.length && <TableRow><TableCell colSpan={5} align="center">{creditCustomers.length ? "No credit customers match your search." : "No credit customers yet. Add one to start a ledger."}</TableCell></TableRow>}
+        {visibleCustomers.map((customer) => <TableRow key={customer.id} hover><TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Stack spacing={0.5}><Typography fontWeight={650}>{customer.customerName}</Typography><CustomerTypeTag customer={customer} /></Stack></Stack></TableCell><TableCell>{customer.phone}</TableCell><TableCell>{customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</TableCell><TableCell align="right"><Typography color={customer.balance > 0 ? "error.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></TableCell><TableCell align="right"><Button size="small" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></TableCell></TableRow>)}
+        {!visibleCustomers.length && <TableRow><TableCell colSpan={5} align="center">{customersWithCredit.length ? "No customers match your search and filter." : "No customers yet. Add one to get started."}</TableCell></TableRow>}
       </TableBody></Table></Paper>
-      <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" } }}>{visibleCustomers.map((customer, index) => <Paper key={customer.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography variant="subtitle2">Customer #{index + 1}</Typography><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="h6">{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography></Box></Stack><Stack direction="row" sx={{ justifyContent: "space-between" }}><Typography variant="body2" color="text.secondary">Balance</Typography><Typography fontWeight={700} color={customer.balance > 0 ? "error.main" : "success.main"}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></Stack><Typography variant="body2" color="text.secondary">Credit limit: {customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</Typography><Stack direction="row" spacing={1}><Button size="small" variant="outlined" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></Stack></Stack></Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>{creditCustomers.length ? "No credit customers match your search." : "No credit customers yet. Add one to start a ledger."}</Paper>}</Stack>
+      <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" } }}>{visibleCustomers.map((customer, index) => <Paper key={customer.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography variant="subtitle2">Customer #{index + 1}</Typography><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="h6">{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography><Box sx={{ mt: 0.5 }}><CustomerTypeTag customer={customer} /></Box></Box></Stack><Stack direction="row" sx={{ justifyContent: "space-between" }}><Typography variant="body2" color="text.secondary">Balance</Typography><Typography fontWeight={700} color={customer.balance > 0 ? "error.main" : "success.main"}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></Stack><Typography variant="body2" color="text.secondary">Credit limit: {customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</Typography><Stack direction="row" spacing={1}><Button size="small" variant="outlined" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></Stack></Stack></Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>{customersWithCredit.length ? "No customers match your search and filter." : "No customers yet. Add one to get started."}</Paper>}</Stack>
     </>}
 
     <Dialog open={Boolean(selected) && !customerDialog && !purchaseDialog && !paymentDialog} onClose={() => setSelected(null)} fullWidth maxWidth="md">
@@ -273,14 +327,22 @@ export default function CustomerPage() {
       <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
         {ledgerError && <Alert severity="error">{ledgerError}</Alert>}
         <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography color="text.secondary">Current balance</Typography><Typography variant="h4" color={balance > 0 ? "error.main" : "success.main"}>{money(balance)}</Typography>{creditLimit > 0 ? <><LinearProgress variant="determinate" value={Math.min(100, balance / creditLimit * 100)} color={balance > creditLimit ? "error" : "primary"} /><Typography variant="body2" color="text.secondary">{money(balance)} of {money(creditLimit)} limit</Typography></> : <Typography variant="body2" color="text.secondary">No credit limit</Typography>}</Stack></Paper>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}><Button variant="outlined" startIcon={<MessageOutlinedIcon />} component="a" href={`https://wa.me/${String(selected?.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</Button><Button variant="outlined" startIcon={<CallOutlinedIcon />} component="a" href={`tel:${selected?.phone ?? ""}`}>Call</Button><Button variant="contained" onClick={beginPurchase}>Add purchase</Button><Button variant="outlined" onClick={beginPayment} disabled={balance <= 0}>Receive payment</Button><Button variant="text" onClick={() => openCustomerForm(selected)}>Edit customer</Button></Stack>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}><Button variant="outlined" startIcon={<MessageOutlinedIcon />} component="a" href={`https://wa.me/${String(selected?.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</Button><Button variant="outlined" startIcon={<CallOutlinedIcon />} component="a" href={`tel:${selected?.phone ?? ""}`}>Call</Button><Button variant="contained" onClick={beginPurchase}>Add purchase</Button><Button variant="outlined" onClick={beginPayment} disabled={balance <= 0}>Record payment</Button><Button variant="text" onClick={() => openCustomerForm(selected)}>Edit customer</Button><Button color="error" variant="text" onClick={() => void removeCustomer()}>Remove customer</Button></Stack>
         <Typography variant="h6">Ledger</Typography>
         {ledgerLoading ? <CircularProgress size={24} /> : ledgerGroups.length ? ledgerGroups.map((group) => <Paper key={group.date} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography fontWeight={700}>{group.date}</Typography>{group.items.map((entry) => <Stack key={entry.id} direction="row" spacing={2} sx={{ justifyContent: "space-between" }}><Typography>{entry.label}</Typography><Typography color={entry.kind === "payment" ? "success.main" : "text.primary"}>{entry.kind === "payment" ? "−" : ""}{money(entry.amount)}</Typography></Stack>)}{group.purchaseTotal > 0 && <Stack direction="row" sx={{ justifyContent: "space-between", borderTop: 1, borderColor: "divider", pt: 1 }}><Typography fontWeight={650}>Day total</Typography><Typography fontWeight={650}>{money(group.purchaseTotal)}</Typography></Stack>}</Stack></Paper>) : <Typography color="text.secondary">No purchases or payments recorded yet.</Typography>}
       </Stack></DialogContent>
     </Dialog>
 
     <Dialog open={customerDialog} onClose={() => !customerSaving && setCustomerDialog(false)} fullWidth maxWidth="sm" slotProps={{ paper: { component: "form", onSubmit: saveCustomer } }}>
-      <DialogTitle>{editing ? "Edit credit customer" : "Add credit customer"}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{customerError && <Alert severity="error">{customerError}</Alert>}<TextField autoFocus required label="Name" value={customerForm.customerName} onChange={(event) => setCustomerForm({ ...customerForm, customerName: event.target.value })} /><TextField required label="Phone" value={customerForm.phone} onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })} /><TextField label="Email" type="email" value={customerForm.email} onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })} /><TextField label="Address" value={customerForm.address} onChange={(event) => setCustomerForm({ ...customerForm, address: event.target.value })} /><TextField label="Credit limit (Rs)" type="number" value={customerForm.creditLimit} onChange={(event) => setCustomerForm({ ...customerForm, creditLimit: event.target.value })} helperText="Leave blank or enter 0 for no limit." slotProps={{ htmlInput: { min: 0, step: "0.01" } }} /></Stack></DialogContent><DialogActions><Button onClick={() => setCustomerDialog(false)}>Cancel</Button><Button type="submit" variant="contained" disabled={customerSaving}>{customerSaving ? "Saving…" : "Save customer"}</Button></DialogActions>
+      <DialogTitle>{editing ? "Edit customer" : "Add customer"}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{customerError && <Alert severity="error">{customerError}</Alert>}<TextField autoFocus required label="Name" value={customerForm.customerName} onChange={(event) => setCustomerForm({ ...customerForm, customerName: event.target.value })} /><TextField required label="Phone" value={customerForm.phone} onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })} /><TextField label="Email" type="email" value={customerForm.email} onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })} /><TextField label="Address" value={customerForm.address} onChange={(event) => setCustomerForm({ ...customerForm, address: event.target.value })} />
+        <Box component="fieldset" sx={{ border: 0, p: 0, m: 0 }}>
+          <Typography component="legend" variant="body2" fontWeight={600}>Customer type</Typography>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {[["instant", "Pays instantly"], ["credit", "Credit customer"], ["sometimes", "Sometimes pays"]].map(([value, label]) => <Box component="label" key={value} sx={{ display: "flex", alignItems: "center", gap: 1, minHeight: 44, cursor: "pointer" }}><input type="radio" name="customerType" value={value} checked={formCustomerType === value} onChange={() => chooseCustomerType(value)} />{label}</Box>)}
+          </Stack>
+        </Box>
+        <TextField label="Credit limit (Rs)" type="number" value={customerForm.creditLimit} onChange={(event) => setCustomerForm({ ...customerForm, creditLimit: event.target.value })} helperText={formCustomerType === "sometimes" ? `Enter a limit from Rs 1 to Rs ${SMALL_LIMIT}.` : formCustomerType === "credit" ? "Enter a limit greater than Rs 0." : "Pays instantly customers have no credit limit."} error={Boolean(customerError && (formCustomerType === "credit" || formCustomerType === "sometimes"))} slotProps={{ htmlInput: { min: formCustomerType === "sometimes" ? 1 : 0, max: formCustomerType === "sometimes" ? SMALL_LIMIT : undefined, step: "0.01" } }} />
+      </Stack></DialogContent><DialogActions><Button onClick={() => setCustomerDialog(false)}>Cancel</Button><Button type="submit" variant="contained" disabled={customerSaving}>{customerSaving ? "Saving…" : "Save customer"}</Button></DialogActions>
     </Dialog>
 
     <Dialog open={purchaseDialog} onClose={() => !purchaseSaving && setPurchaseDialog(false)} fullWidth maxWidth="sm" slotProps={{ paper: { component: "form", onSubmit: savePurchase } }}>

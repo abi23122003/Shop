@@ -13,6 +13,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     List<Customer> findByCustomerNameContainingIgnoreCase(String keyword);
 
+    @Query("SELECT c FROM Customer c WHERE c.active = true")
+    List<Customer> findAllActiveCustomers();
+
     Page<Customer> findAll(Pageable pageable);
     Page<Customer> findByCustomerNameContainingIgnoreCase(
         String keyword,
