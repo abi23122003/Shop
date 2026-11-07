@@ -4,9 +4,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.smartshop.backend.dto.LoginRequest;
 import com.smartshop.backend.dto.LoginResponse;
@@ -29,7 +32,9 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
 
         String username = request.getUsername().trim();
-        if (loginAttemptService.isBlocked(username)) {
+        String rateLimitKey = buildRateLimitKey(username);
+
+        if (loginAttemptService.isBlocked(rateLimitKey)) {
             throw new BadCredentialsException("Invalid username or password");
         }
 
@@ -41,13 +46,34 @@ public class AuthServiceImpl implements AuthService {
                     )
             );
         } catch (BadCredentialsException | UsernameNotFoundException ex) {
-            loginAttemptService.recordFailure(username);
+            loginAttemptService.recordFailure(rateLimitKey);
             throw new BadCredentialsException("Invalid username or password");
         }
 
-        loginAttemptService.recordSuccess(username);
+        loginAttemptService.recordSuccess(rateLimitKey);
         String token = jwtService.generateToken(username);
 
         return new LoginResponse(token);
+    }
+
+    private String buildRateLimitKey(String username) {
+        String clientIp = resolveClientIp();
+        return clientIp + ":" + username.toLowerCase();
+    }
+
+    private String resolveClientIp() {
+        try {
+            ServletRequestAttributes attributes =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null && attributes.getRequest() != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String remoteAddr = request.getRemoteAddr();
+                if (remoteAddr != null && !remoteAddr.isBlank()) {
+                    return remoteAddr.trim();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "local";
     }
 }

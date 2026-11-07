@@ -16,10 +16,10 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
 
     List<CreditTransaction> findBySale(Sale sale);
 
-    @Query("select coalesce(sum(case when upper(t.type) = 'PAYMENT' then -t.amount else t.amount end), 0) from CreditTransaction t where t.credit = :credit")
+    @Query("select coalesce(sum(case when upper(t.type) = 'PAYMENT' then -t.amount when upper(t.type) = 'REFUND' then t.amount else t.amount end), 0) from CreditTransaction t where t.credit = :credit")
     java.math.BigDecimal calculateBalance(@Param("credit") Credit credit);
 
-    @Query("select coalesce(sum(case when upper(t.type) = 'PAYMENT' then t.amount else 0 end), 0) from CreditTransaction t where t.credit = :credit")
+    @Query("select coalesce(sum(case when upper(t.type) = 'PAYMENT' then t.amount when upper(t.type) = 'REFUND' then -t.amount else 0 end), 0) from CreditTransaction t where t.credit = :credit")
     java.math.BigDecimal calculateTotalPaid(@Param("credit") Credit credit);
 
     @Query("select coalesce(sum(case when upper(t.type) in ('PURCHASE', 'REVERSAL') then t.amount else 0 end), 0) from CreditTransaction t where t.credit = :credit")

@@ -13,6 +13,8 @@ public interface CreditService {
 
     CreditDTO recordPayment(Long customerId, BigDecimal amount, String remarks);
 
+    CreditDTO recordRefund(Long customerId, BigDecimal amount, String remarks);
+
     CreditDTO getCreditByCustomer(Long customerId);
 
     List<CreditDTO> getAllCredits();

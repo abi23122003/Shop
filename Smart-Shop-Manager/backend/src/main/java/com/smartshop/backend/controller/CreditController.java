@@ -46,6 +46,16 @@ public class CreditController {
         );
     }
 
+    @PostMapping("/refund")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CreditDTO recordRefund(@Valid @RequestBody CreditRequest request) {
+        return creditService.recordRefund(
+                request.getCustomerId(),
+                request.getAmount(),
+                request.getRemarks()
+        );
+    }
+
     @GetMapping("/customer/{customerId}")
     public CreditDTO getCreditByCustomer(@PathVariable Long customerId) {
         return creditService.getCreditByCustomer(customerId);

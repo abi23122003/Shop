@@ -70,6 +70,14 @@ public CustomerDTO updateCustomer(Long id, CustomerDTO customerDTO) {
     customer.setCreditLimit(customerDTO.getCreditLimit());
     customer.setCreditEnabled(customerDTO.getCreditEnabled());
     if (customerDTO.getActive() != null) {
+        if (Boolean.FALSE.equals(customerDTO.getActive())) {
+            BigDecimal balance = creditRepository.findByCustomer(customer)
+                    .map(credit -> credit.getBalance() == null ? BigDecimal.ZERO : credit.getBalance())
+                    .orElse(BigDecimal.ZERO);
+            if (balance.signum() > 0) {
+                throw new IllegalArgumentException("Cannot deactivate customer while the outstanding balance is " + balance);
+            }
+        }
         customer.setActive(customerDTO.getActive());
     }
 

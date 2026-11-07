@@ -187,4 +187,46 @@ class SaleServiceTest {
 
         assertThrows(IllegalStateException.class, () -> saleService.reverseSale(3L, "Again"));
     }
+
+    @Test
+    void reversesPaidCreditSaleAndSetsCreditBalanceStatus() {
+        Customer customer = new Customer();
+        customer.setId(1L);
+        Sale sale = new Sale();
+        sale.setId(5L);
+        sale.setSaleCode("TXN-5");
+        sale.setSaleDate(LocalDate.now());
+        sale.setCustomer(customer);
+        sale.setPaymentMethod("Credit");
+        sale.setTotalAmount(BigDecimal.valueOf(100));
+        Product product = new Product();
+        product.setId(6L);
+        product.setQuantity(5);
+        SaleItem item = new SaleItem();
+        item.setSale(sale);
+        item.setProduct(product);
+        item.setQuantity(1);
+        sale.setSaleItems(java.util.List.of(item));
+
+        Credit credit = new Credit();
+        credit.setCustomer(customer);
+        credit.setBalance(BigDecimal.ZERO);
+        credit.setTotalCredit(BigDecimal.valueOf(100));
+        credit.setTotalPaid(BigDecimal.valueOf(100));
+        credit.setStatus("PAID");
+
+        when(saleRepository.findById(5L)).thenReturn(Optional.of(sale));
+        when(creditRepository.findByCustomer(customer)).thenReturn(Optional.of(credit));
+        // With payment of 100 and reversal of -100, updated balance is -100 (credit balance / refund due)
+        when(creditTransactionRepository.calculateBalance(credit)).thenReturn(BigDecimal.valueOf(-100));
+        when(creditTransactionRepository.calculateTotalPaid(credit)).thenReturn(BigDecimal.valueOf(100));
+        when(creditTransactionRepository.calculateTotalCredit(credit)).thenReturn(BigDecimal.ZERO);
+
+        saleService.reverseSale(5L, "Customer returned goods after paying");
+
+        assertEquals(BigDecimal.valueOf(-100), credit.getBalance());
+        assertEquals("CREDIT_BALANCE", credit.getStatus());
+        assertEquals("REVERSED", sale.getStatus());
+        verify(creditRepository).save(credit);
+    }
 }

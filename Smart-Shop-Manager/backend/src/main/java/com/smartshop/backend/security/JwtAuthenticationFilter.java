@@ -27,6 +27,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtService jwtService;
 
     @Autowired
+    private TokenRevocationService tokenRevocationService;
+
+    @Autowired
     private UserDetailsService userDetailsService;
 
     @Override
@@ -54,7 +57,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserDetails userDetails =
                         userDetailsService.loadUserByUsername(username);
 
-                if (jwtService.validateToken(jwt, userDetails.getUsername())) {
+                if (!tokenRevocationService.isRevoked(jwt)
+                        && jwtService.validateToken(jwt, userDetails.getUsername())) {
 
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(

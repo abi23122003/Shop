@@ -58,6 +58,7 @@ public CreditDTO addCreditPurchase(Long customerId, BigDecimal amount, String re
 
     credit.setTotalCredit(totalCredit.add(amount));
     credit.setBalance(balance.add(amount));
+    credit.setStatus(credit.getBalance().signum() > 0 ? "PENDING" : (credit.getBalance().signum() < 0 ? "CREDIT_BALANCE" : "PAID"));
 
 } else {
 
@@ -68,7 +69,7 @@ public CreditDTO addCreditPurchase(Long customerId, BigDecimal amount, String re
     credit.setTotalCredit(amount);
     credit.setTotalPaid(BigDecimal.ZERO);
     credit.setBalance(amount);
-    credit.setStatus("PENDING");
+    credit.setStatus(amount.signum() > 0 ? "PENDING" : "PAID");
 }
 
     creditRepository.save(credit);
@@ -98,6 +99,9 @@ public CreditDTO recordPayment(Long customerId, BigDecimal amount, String remark
             .orElseThrow(() -> new EntityNotFoundException("No credit account found for customer id: " + customerId));
 
     BigDecimal currentBalance = valueOrZero(credit.getBalance());
+    if (currentBalance.signum() <= 0) {
+        throw new IllegalArgumentException("Customer has no outstanding balance to pay.");
+    }
     if (amount.compareTo(currentBalance) > 0) {
         throw new IllegalArgumentException("Payment cannot exceed the outstanding balance");
     }
@@ -119,6 +123,46 @@ public CreditDTO recordPayment(Long customerId, BigDecimal amount, String remark
     transaction.setType("PAYMENT");
     transaction.setAmount(amount);
     transaction.setRemarks(remarks);
+
+    creditTransactionRepository.save(transaction);
+
+    return CreditMapper.toDTO(credit);
+}
+
+@Override
+@Transactional
+public CreditDTO recordRefund(Long customerId, BigDecimal amount, String remarks) {
+
+    validateAmount(amount);
+    Customer customer = customerRepository.findById(customerId)
+            .orElseThrow(() -> new EntityNotFoundException("Customer not found with id: " + customerId));
+
+    Credit credit = creditRepository.findByCustomerForUpdate(customer)
+            .orElseThrow(() -> new EntityNotFoundException("No credit account found for customer id: " + customerId));
+
+    BigDecimal currentBalance = valueOrZero(credit.getBalance());
+    if (currentBalance.signum() >= 0) {
+        throw new IllegalArgumentException("Customer does not have a refundable credit balance.");
+    }
+
+    BigDecimal availableRefund = currentBalance.negate();
+    if (amount.compareTo(availableRefund) > 0) {
+        throw new IllegalArgumentException("Refund amount cannot exceed the available credit balance of " + availableRefund);
+    }
+
+    BigDecimal newBalance = currentBalance.add(amount);
+    credit.setBalance(newBalance);
+    credit.setTotalPaid(valueOrZero(credit.getTotalPaid()).subtract(amount));
+    credit.setStatus(newBalance.signum() > 0 ? "PENDING" : (newBalance.signum() < 0 ? "CREDIT_BALANCE" : "PAID"));
+
+    creditRepository.save(credit);
+
+    CreditTransaction transaction = new CreditTransaction();
+    transaction.setCredit(credit);
+    transaction.setTransactionDate(java.time.LocalDate.now());
+    transaction.setType("REFUND");
+    transaction.setAmount(amount);
+    transaction.setRemarks(remarks == null || remarks.isBlank() ? "Customer refund for credit balance" : remarks.trim());
 
     creditTransactionRepository.save(transaction);
 

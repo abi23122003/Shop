@@ -28,6 +28,8 @@ public class DataInitializer {
                            CategoryRepository categoryRepository) {
 
         return args -> {
+            validateAdminCredentials(adminUsername, adminPassword);
+
             List<User> adminUsers = userRepository.findByRole("ROLE_ADMIN");
 
             if (!adminUsers.isEmpty()) {
@@ -70,5 +72,23 @@ public class DataInitializer {
                 }
             }
         };
+    }
+
+    public static void validateAdminCredentials(String username, String password) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalStateException("Admin username must be configured and cannot be blank.");
+        }
+        if (password == null || password.trim().isEmpty()) {
+            throw new IllegalStateException("Admin password must be configured and cannot be blank.");
+        }
+        if (password.length() < 8) {
+            throw new IllegalStateException("Admin password must be at least 8 characters long.");
+        }
+        String normalized = password.trim().toLowerCase();
+        if (normalized.equals("admin123") || normalized.equals("password") || normalized.equals("admin")
+                || normalized.equals("12345678") || normalized.equals("password123")
+                || normalized.equals("changeme") || normalized.equals("root1234")) {
+            throw new IllegalStateException("Admin password cannot use known default or weak passwords.");
+        }
     }
 }

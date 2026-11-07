@@ -8,6 +8,7 @@ import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, 
 import api from "../services/api";
 import { getApiErrorMessage } from "../services/apiErrors";
 import { formatDateOnly } from "../utils/dateUtils";
+import { buildLedgerGroups } from "../modules/credit/creditLedger";
 
 const money = (value) => `Rs ${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const blankCustomer = { customerName: "", phone: "", email: "", address: "", creditLimit: "" };
@@ -69,6 +70,10 @@ export default function CustomerPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [refundDialog, setRefundDialog] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundSaving, setRefundSaving] = useState(false);
+  const [refundError, setRefundError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,7 +110,7 @@ export default function CustomerPage() {
     return customersWithCredit.filter((customer) => (!query || `${customer.customerName} ${customer.phone}`.toLowerCase().includes(query)) && (customerFilter === "all" || customerType(customer) === customerFilter));
   }, [customersWithCredit, customerFilter, search]);
   // Summary uses the same tab-and-search result as the customer list.
-  const totalOwed = visibleCustomers.reduce((sum, customer) => sum + customer.balance, 0);
+  const totalOwed = visibleCustomers.reduce((sum, customer) => sum + Math.max(0, customer.balance), 0);
   const customerCounts = visibleCustomers.reduce((counts, customer) => {
     counts[customerType(customer)] += 1;
     return counts;
@@ -267,6 +272,35 @@ export default function CustomerPage() {
     }
   }
 
+  // Opens refund dialog when customer has a negative balance (credit balance from reversed paid sale)
+  function beginRefund() {
+    blurActiveElement();
+    setRefundAmount(balance < 0 ? String(Math.abs(balance)) : "");
+    setRefundError("");
+    setRefundDialog(true);
+  }
+
+  // Issues refund up to the customer's available credit balance via POST /api/credits/refund
+  async function saveRefund(event) {
+    event.preventDefault();
+    const amount = Number(refundAmount);
+    const maxRefund = balance < 0 ? Math.abs(balance) : 0;
+    if (!amount || amount <= 0) return setRefundError("Enter a refund amount greater than zero.");
+    if (amount > maxRefund) return setRefundError(`Refund cannot exceed the available credit balance of ${money(maxRefund)}.`);
+    setRefundSaving(true);
+    setRefundError("");
+    try {
+      await api.post("/credits/refund", { customerId: selected.id, amount, remarks: "Customer refund for credit balance" });
+      setRefundDialog(false);
+      await load();
+      await openLedger({ ...selected, balance: balance + amount, credit: { ...selected.credit, balance: balance + amount } });
+    } catch (error) {
+      setRefundError(messageFor(error, "Could not record this refund."));
+    } finally {
+      setRefundSaving(false);
+    }
+  }
+
   async function removeCustomer() {
     if (!selected || !window.confirm("Remove this customer? Their history is kept.")) return;
     setLedgerError("");
@@ -280,27 +314,7 @@ export default function CustomerPage() {
   }
 
   const ledgerGroups = useMemo(() => {
-    if (!selected) return [];
-    const entries = [];
-    selected.customerSales.forEach((sale) => {
-      (sale.saleItems ?? []).forEach((item) => {
-        const itemProduct = products.find((entry) => Number(entry.id) === Number(item.productId));
-        entries.push({ date: sale.saleDate, kind: "purchase", id: `${sale.id}-${item.id ?? item.productId}`, label: `${itemProduct?.productName ?? `Product #${item.productId}`} x ${item.quantity} · ${sale.paymentMethod || "Cash"}${sale.status === "REVERSED" ? " · Reversed" : ""}`, amount: amountOf(item.totalPrice ?? amountOf(item.sellingPrice) * amountOf(item.quantity)), reversed: sale.status === "REVERSED" });
-      });
-    });
-    history.filter((entry) => String(entry.type).toUpperCase() === "PAYMENT").forEach((entry) => {
-      entries.push({ date: entry.transactionDate, kind: "payment", id: `payment-${entry.id}`, label: entry.remarks || "Payment received", amount: amountOf(entry.amount) });
-    });
-    const grouped = new Map();
-    entries.forEach((entry) => {
-      if (!grouped.has(entry.date)) grouped.set(entry.date, []);
-      grouped.get(entry.date).push(entry);
-    });
-    return [...grouped.entries()].sort(([a], [b]) => String(b).localeCompare(String(a))).map(([date, items]) => ({
-      date,
-      items: items.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "purchase" ? -1 : 1)),
-      purchaseTotal: items.filter((item) => item.kind === "purchase").reduce((sum, item) => sum + item.amount, 0),
-    }));
+    return buildLedgerGroups(selected, history, products);
   }, [selected, history, products]);
 
   return <Stack spacing={3}>
@@ -316,20 +330,20 @@ export default function CustomerPage() {
     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>{[["all", "All"], ["credit", "Credit"], ["sometimes", "Sometimes pays"], ["instant", "Pays instantly"]].map(([value, label]) => <Box key={value} component="button" type="button" aria-pressed={customerFilter === value} onClick={() => setCustomerFilter(value)} sx={{ minHeight: 44, px: 2, border: 1, borderRadius: 5, borderColor: customerFilter === value ? "primary.main" : "divider", bgcolor: customerFilter === value ? "primary.main" : "background.paper", color: customerFilter === value ? "primary.contrastText" : "text.primary", cursor: "pointer", font: "inherit" }}>{label}</Box>)}</Stack>
     {loading ? <Box sx={{ display: "grid", placeItems: "center", minHeight: 160 }}><CircularProgress /></Box> : <>
       <Paper sx={{ display: { xs: "none", md: "block" }, overflowX: "auto" }}><Table><TableHead><TableRow><TableCell>Customer</TableCell><TableCell>Phone</TableCell><TableCell>Credit limit</TableCell><TableCell align="right">Balance</TableCell><TableCell align="right">Actions</TableCell></TableRow></TableHead><TableBody>
-        {visibleCustomers.map((customer) => <TableRow key={customer.id} hover><TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Stack spacing={0.5}><Typography fontWeight={650}>{customer.customerName}</Typography><CustomerTypeTag customer={customer} /></Stack></Stack></TableCell><TableCell>{customer.phone}</TableCell><TableCell>{customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</TableCell><TableCell align="right"><Typography color={customer.balance > 0 ? "error.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></TableCell><TableCell align="right"><Button size="small" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></TableCell></TableRow>)}
+        {visibleCustomers.map((customer) => <TableRow key={customer.id} hover><TableCell><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Stack spacing={0.5}><Typography fontWeight={650}>{customer.customerName}</Typography><CustomerTypeTag customer={customer} /></Stack></Stack></TableCell><TableCell>{customer.phone}</TableCell><TableCell>{customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</TableCell><TableCell align="right"><Typography color={customer.balance > 0 ? "error.main" : customer.balance < 0 ? "info.main" : "success.main"} fontWeight={700}>{customer.balance > 0 ? money(customer.balance) : customer.balance < 0 ? `Credit: ${money(Math.abs(customer.balance))}` : "Cleared"}</Typography></TableCell><TableCell align="right"><Button size="small" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></TableCell></TableRow>)}
         {!visibleCustomers.length && <TableRow><TableCell colSpan={5} align="center">{customersWithCredit.length ? "No customers match your search and filter." : "No customers yet. Add one to get started."}</TableCell></TableRow>}
       </TableBody></Table></Paper>
-      <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" } }}>{visibleCustomers.map((customer, index) => <Paper key={customer.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography variant="subtitle2">Customer #{index + 1}</Typography><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="h6">{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography><Box sx={{ mt: 0.5 }}><CustomerTypeTag customer={customer} /></Box></Box></Stack><Stack direction="row" sx={{ justifyContent: "space-between" }}><Typography variant="body2" color="text.secondary">Balance</Typography><Typography fontWeight={700} color={customer.balance > 0 ? "error.main" : "success.main"}>{customer.balance > 0 ? money(customer.balance) : "Cleared"}</Typography></Stack><Typography variant="body2" color="text.secondary">Credit limit: {customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</Typography><Stack direction="row" spacing={1}><Button size="small" variant="outlined" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></Stack></Stack></Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>{customersWithCredit.length ? "No customers match your search and filter." : "No customers yet. Add one to get started."}</Paper>}</Stack>
+      <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" } }}>{visibleCustomers.map((customer, index) => <Paper key={customer.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography variant="subtitle2">Customer #{index + 1}</Typography><Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}><Avatar>{initials(customer.customerName)}</Avatar><Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="h6">{customer.customerName}</Typography><Typography variant="body2" color="text.secondary">{customer.phone}</Typography><Box sx={{ mt: 0.5 }}><CustomerTypeTag customer={customer} /></Box></Box></Stack><Stack direction="row" sx={{ justifyContent: "space-between" }}><Typography variant="body2" color="text.secondary">Balance</Typography><Typography fontWeight={700} color={customer.balance > 0 ? "error.main" : customer.balance < 0 ? "info.main" : "success.main"}>{customer.balance > 0 ? money(customer.balance) : customer.balance < 0 ? `Credit: ${money(Math.abs(customer.balance))}` : "Cleared"}</Typography></Stack><Typography variant="body2" color="text.secondary">Credit limit: {customer.creditLimit > 0 ? money(customer.creditLimit) : "No limit"}</Typography><Stack direction="row" spacing={1}><Button size="small" variant="outlined" onClick={() => void openLedger(customer)}>View ledger</Button><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => openCustomerForm(customer)}>Edit</Button></Stack></Stack></Paper>)}{!visibleCustomers.length && <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>{customersWithCredit.length ? "No customers match your search and filter." : "No customers yet. Add one to get started."}</Paper>}</Stack>
     </>}
 
     <Dialog open={Boolean(selected) && !customerDialog && !purchaseDialog && !paymentDialog} onClose={() => setSelected(null)} fullWidth maxWidth="md">
       <DialogTitle><Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => setSelected(null)}>Back</Button><Typography variant="h6" component="span" sx={{ ml: 1 }}>{selected?.customerName} ledger</Typography></DialogTitle>
       <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
         {ledgerError && <Alert severity="error">{ledgerError}</Alert>}
-        <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography color="text.secondary">Current balance</Typography><Typography variant="h4" color={balance > 0 ? "error.main" : "success.main"}>{money(balance)}</Typography>{creditLimit > 0 ? <><LinearProgress variant="determinate" value={Math.min(100, balance / creditLimit * 100)} color={balance > creditLimit ? "error" : "primary"} /><Typography variant="body2" color="text.secondary">{money(balance)} of {money(creditLimit)} limit</Typography></> : <Typography variant="body2" color="text.secondary">No credit limit</Typography>}</Stack></Paper>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}><Button variant="outlined" startIcon={<MessageOutlinedIcon />} component="a" href={`https://wa.me/${String(selected?.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</Button><Button variant="outlined" startIcon={<CallOutlinedIcon />} component="a" href={`tel:${selected?.phone ?? ""}`}>Call</Button><Button variant="contained" onClick={beginPurchase}>Add purchase</Button><Button variant="outlined" onClick={beginPayment} disabled={balance <= 0}>Record payment</Button><Button variant="text" onClick={() => openCustomerForm(selected)}>Edit customer</Button><Button color="error" variant="text" onClick={() => void removeCustomer()}>Remove customer</Button></Stack>
+        <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography color="text.secondary">{balance < 0 ? "Customer credit balance (Refund due)" : "Current balance"}</Typography><Typography variant="h4" color={balance > 0 ? "error.main" : balance < 0 ? "info.main" : "success.main"}>{balance < 0 ? `${money(Math.abs(balance))} (Store owes customer)` : money(balance)}</Typography>{creditLimit > 0 ? <><LinearProgress variant="determinate" value={Math.min(100, Math.max(0, balance) / creditLimit * 100)} color={balance > creditLimit ? "error" : "primary"} /><Typography variant="body2" color="text.secondary">{money(balance)} of {money(creditLimit)} limit</Typography></> : <Typography variant="body2" color="text.secondary">No credit limit</Typography>}</Stack></Paper>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}><Button variant="outlined" startIcon={<MessageOutlinedIcon />} component="a" href={`https://wa.me/${String(selected?.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</Button><Button variant="outlined" startIcon={<CallOutlinedIcon />} component="a" href={`tel:${selected?.phone ?? ""}`}>Call</Button><Button variant="contained" onClick={beginPurchase}>Add purchase</Button><Button variant="outlined" onClick={beginPayment} disabled={balance <= 0}>Record payment</Button>{balance < 0 && <Button variant="outlined" color="info" onClick={beginRefund}>Issue refund</Button>}<Button variant="text" onClick={() => openCustomerForm(selected)}>Edit customer</Button><Button color="error" variant="text" onClick={() => void removeCustomer()}>Remove customer</Button></Stack>
         <Typography variant="h6">Ledger</Typography>
-        {ledgerLoading ? <CircularProgress size={24} /> : ledgerGroups.length ? ledgerGroups.map((group) => <Paper key={group.date} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography fontWeight={700}>{group.date}</Typography>{group.items.map((entry) => <Stack key={entry.id} direction="row" spacing={2} sx={{ justifyContent: "space-between" }}><Typography>{entry.label}</Typography><Typography color={entry.kind === "payment" ? "success.main" : "text.primary"}>{entry.kind === "payment" ? "−" : ""}{money(entry.amount)}</Typography></Stack>)}{group.purchaseTotal > 0 && <Stack direction="row" sx={{ justifyContent: "space-between", borderTop: 1, borderColor: "divider", pt: 1 }}><Typography fontWeight={650}>Day total</Typography><Typography fontWeight={650}>{money(group.purchaseTotal)}</Typography></Stack>}</Stack></Paper>) : <Typography color="text.secondary">No purchases or payments recorded yet.</Typography>}
+        {ledgerLoading ? <CircularProgress size={24} /> : ledgerGroups.length ? ledgerGroups.map((group) => <Paper key={group.date} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Typography fontWeight={700}>{group.date}</Typography>{group.items.map((entry) => <Stack key={entry.id} direction="row" spacing={2} sx={{ justifyContent: "space-between" }}><Typography>{entry.label}</Typography><Typography color={entry.kind === "payment" ? "success.main" : entry.kind === "reversal" ? "warning.main" : entry.kind === "refund" ? "info.main" : "text.primary"}>{entry.kind === "payment" || entry.kind === "reversal" ? "−" : entry.kind === "refund" ? "+" : ""}{money(entry.amount)}</Typography></Stack>)}{group.purchaseTotal > 0 && <Stack direction="row" sx={{ justifyContent: "space-between", borderTop: 1, borderColor: "divider", pt: 1 }}><Typography fontWeight={650}>Day total</Typography><Typography fontWeight={650}>{money(group.purchaseTotal)}</Typography></Stack>}</Stack></Paper>) : <Typography color="text.secondary">No purchases or payments recorded yet.</Typography>}
       </Stack></DialogContent>
     </Dialog>
 
@@ -351,6 +365,10 @@ export default function CustomerPage() {
 
     <Dialog open={paymentDialog} onClose={() => !paymentSaving && setPaymentDialog(false)} fullWidth maxWidth="xs" slotProps={{ paper: { component: "form", onSubmit: savePayment } }}>
       <DialogTitle>Receive payment</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{paymentError && <Alert severity="error">{paymentError}</Alert>}<Typography>Outstanding balance: {money(balance)}</Typography><TextField autoFocus required label="Amount received (Rs)" type="number" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} slotProps={{ htmlInput: { min: 0.01, max: balance, step: "0.01" } }} /></Stack></DialogContent><DialogActions><Button onClick={() => setPaymentDialog(false)}>Cancel</Button><Button type="submit" variant="contained" disabled={paymentSaving}>{paymentSaving ? "Saving…" : "Receive payment"}</Button></DialogActions>
+    </Dialog>
+
+    <Dialog open={refundDialog} onClose={() => !refundSaving && setRefundDialog(false)} fullWidth maxWidth="xs" slotProps={{ paper: { component: "form", onSubmit: saveRefund } }}>
+      <DialogTitle>Issue customer refund</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{refundError && <Alert severity="error">{refundError}</Alert>}<Typography>Available credit balance: {money(Math.abs(balance))}</Typography><TextField autoFocus required label="Refund amount (Rs)" type="number" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} slotProps={{ htmlInput: { min: 0.01, max: Math.abs(balance), step: "0.01" } }} /></Stack></DialogContent><DialogActions><Button onClick={() => setRefundDialog(false)}>Cancel</Button><Button type="submit" variant="contained" color="info" disabled={refundSaving}>{refundSaving ? "Saving…" : "Issue refund"}</Button></DialogActions>
     </Dialog>
   </Stack>;
 }

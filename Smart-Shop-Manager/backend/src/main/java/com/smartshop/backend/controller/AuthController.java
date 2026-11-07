@@ -1,13 +1,19 @@
 package com.smartshop.backend.controller;
 
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import com.smartshop.backend.dto.LoginRequest;
 import com.smartshop.backend.dto.LoginResponse;
+import com.smartshop.backend.security.TokenRevocationService;
 import com.smartshop.backend.service.AuthService;
 
 @RestController
@@ -17,8 +23,21 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private TokenRevocationService tokenRevocationService;
+
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            tokenRevocationService.revokeToken(token);
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }

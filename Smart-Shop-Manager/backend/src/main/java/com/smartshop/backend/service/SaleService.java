@@ -246,6 +246,9 @@ public void reverseSale(Long id, String reason) {
         stockMovementRepository.save(movement);
     }
 
+    // For credit sales, create a reversal transaction and recalculate credit account balance.
+    // If the sale was already partially or fully paid, the resulting negative balance represents
+    // a customer credit balance (or refund due) and status is set to CREDIT_BALANCE.
     if ("Credit".equalsIgnoreCase(sale.getPaymentMethod()) && sale.getCustomer() != null) {
         creditRepository.findByCustomer(sale.getCustomer()).ifPresent(credit -> {
             CreditTransaction reversal = new CreditTransaction();
@@ -263,7 +266,8 @@ public void reverseSale(Long id, String reason) {
             credit.setBalance(updatedBalance);
             credit.setTotalPaid(updatedTotalPaid);
             credit.setTotalCredit(updatedTotalCredit);
-            credit.setStatus(updatedBalance.signum() <= 0 ? "PAID" : "PENDING");
+            // When balance is negative, customer has store credit / refund due
+            credit.setStatus(updatedBalance.signum() > 0 ? "PENDING" : (updatedBalance.signum() < 0 ? "CREDIT_BALANCE" : "PAID"));
             creditRepository.save(credit);
         });
     }
