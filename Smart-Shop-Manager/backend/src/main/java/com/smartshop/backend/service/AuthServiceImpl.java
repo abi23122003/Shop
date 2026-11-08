@@ -13,8 +13,13 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import com.smartshop.backend.dto.LoginRequest;
 import com.smartshop.backend.dto.LoginResponse;
+import com.smartshop.backend.dto.RegisterRequest;
+import com.smartshop.backend.dto.RegisterResponse;
+import com.smartshop.backend.entity.User;
+import com.smartshop.backend.repository.UserRepository;
 import com.smartshop.backend.security.JwtService;
 import com.smartshop.backend.security.LoginAttemptService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -27,6 +32,46 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public RegisterResponse register(RegisterRequest request) {
+        if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        String username = request.getUsername().trim();
+
+        if (request.getPassword() == null || request.getPassword().length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters long");
+        }
+
+        if (request.getConfirmPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Password confirmation does not match password");
+        }
+
+        if (userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("Username '" + username + "' is already taken. Please choose another username.");
+        }
+
+        User newUser = new User();
+        newUser.setUsername(username);
+        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        newUser.setRole("ROLE_USER");
+        newUser.setApproved(false); // Requires administrator approval before sign-in
+
+        userRepository.save(newUser);
+
+        return new RegisterResponse(
+                "Registration successful! Your account has been created and is pending administrator approval before you can sign in.",
+                username,
+                false
+        );
+    }
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -46,6 +91,8 @@ public class AuthServiceImpl implements AuthService {
                             request.getPassword()
                     )
             );
+        } catch (org.springframework.security.authentication.DisabledException ex) {
+            throw ex;
         } catch (BadCredentialsException | UsernameNotFoundException ex) {
             loginAttemptService.recordFailure(rateLimitKey);
             throw new BadCredentialsException("Invalid username or password");

@@ -48,8 +48,13 @@ public class DataInitializer {
                     targetAdmin.setPassword(passwordEncoder.encode(adminPassword));
                     needsUpdate = true;
                 }
+                if (!targetAdmin.isApproved()) {
+                    targetAdmin.setApproved(true);
+                    needsUpdate = true;
+                }
                 if (needsUpdate) {
                     targetAdmin.setRole("ROLE_ADMIN");
+                    targetAdmin.setApproved(true);
                     userRepository.save(targetAdmin);
                 }
             } else {
@@ -58,6 +63,7 @@ public class DataInitializer {
                 admin.setUsername(adminUsername);
                 admin.setPassword(passwordEncoder.encode(adminPassword));
                 admin.setRole("ROLE_ADMIN");
+                admin.setApproved(true);
                 userRepository.save(admin);
             }
 

@@ -9,27 +9,29 @@ import {
   CircularProgress,
   IconButton,
   InputAdornment,
+  Link,
   Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { paths } from "../routes/paths";
 import { getApiErrorMessage } from "../services/apiErrors";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const location = useLocation();
+  const [username, setUsername] = useState(location.state?.registeredUsername || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState(location.state?.infoMessage || "");
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const destination = location.state?.from?.pathname ?? paths.dashboard;
 
   if (isAuthenticated) return <Navigate to={paths.dashboard} replace />;
@@ -37,6 +39,7 @@ export default function Login() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setInfoMessage("");
 
     const errors = {};
     if (!username.trim()) {
@@ -57,11 +60,14 @@ export default function Login() {
       await login(username.trim(), password);
       navigate(destination, { replace: true });
     } catch (requestError) {
-      setError(
-        requestError.response?.status === 401
-          ? "Invalid username or password. Please try again."
-          : getApiErrorMessage(requestError, "Sign-in failed. Please try again.")
-      );
+      const resp = requestError.response;
+      if (resp?.status === 403 || resp?.data?.message?.toLowerCase().includes("approval")) {
+        setError(resp?.data?.message || "Your account is pending administrator approval before you can sign in.");
+      } else if (resp?.status === 401) {
+        setError("Invalid username or password. Please try again.");
+      } else {
+        setError(getApiErrorMessage(requestError, "Sign-in failed. Please try again."));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -210,6 +216,12 @@ export default function Login() {
               </Typography>
             </Box>
 
+            {infoMessage && (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                {infoMessage}
+              </Alert>
+            )}
+
             {error && (
               <Alert severity="error" sx={{ borderRadius: 2 }}>
                 {error}
@@ -294,6 +306,24 @@ export default function Login() {
                 "Sign In"
               )}
             </Button>
+
+            <Box sx={{ textAlign: "center", pt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?{" "}
+                <Link
+                  component={RouterLink}
+                  to={paths.register}
+                  sx={{
+                    fontWeight: 600,
+                    color: "primary.main",
+                    textDecoration: "none",
+                    "&:hover": { textDecoration: "underline" },
+                  }}
+                >
+                  Create account
+                </Link>
+              </Typography>
+            </Box>
           </Stack>
         </Box>
       </Paper>

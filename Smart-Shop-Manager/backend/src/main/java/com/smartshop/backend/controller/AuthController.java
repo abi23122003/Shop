@@ -13,6 +13,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import com.smartshop.backend.dto.LoginRequest;
 import com.smartshop.backend.dto.LoginResponse;
+import com.smartshop.backend.dto.RegisterRequest;
+import com.smartshop.backend.dto.RegisterResponse;
 import com.smartshop.backend.security.TokenRevocationService;
 import com.smartshop.backend.service.AuthService;
 
@@ -29,6 +31,12 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = authService.register(request);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/logout")

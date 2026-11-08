@@ -1,9 +1,9 @@
 import axios from "axios";
-import { tokenStorage } from "./storage/tokenStorage";
-import { getApiErrorMessage } from "./apiErrors";
+import { tokenStorage } from "./storage/tokenStorage.js";
+import { getApiErrorMessage } from "./apiErrors.js";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
+  baseURL: (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || "/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -18,7 +18,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       tokenStorage.clear();
-      window.dispatchEvent(new Event("smart-shop-session-expired"));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("smart-shop-session-expired"));
+      }
     }
 
     error.userMessage = getApiErrorMessage(error);

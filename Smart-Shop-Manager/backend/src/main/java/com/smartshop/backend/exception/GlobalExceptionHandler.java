@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -75,6 +76,13 @@ public class GlobalExceptionHandler {
     public Map<String, String> handleAccessDenied(AccessDeniedException ex) {
         log.warn("Access denied: {}", ex.getMessage());
         return Map.of("message", "Access denied: insufficient permissions");
+    }
+
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ExceptionHandler(DisabledException.class)
+    public Map<String, String> handleDisabledException(DisabledException ex) {
+        log.warn("Account is disabled or pending approval: {}", ex.getMessage());
+        return Map.of("message", "Your account is pending administrator approval before you can sign in.");
     }
 
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
