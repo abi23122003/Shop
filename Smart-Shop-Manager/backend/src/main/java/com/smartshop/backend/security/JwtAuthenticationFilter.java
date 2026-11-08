@@ -58,7 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         userDetailsService.loadUserByUsername(username);
 
                 if (!tokenRevocationService.isRevoked(jwt)
-                        && jwtService.validateToken(jwt, userDetails.getUsername())) {
+                        && jwtService.validateToken(jwt, userDetails.getUsername(), userDetails.getPassword())) {
 
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(

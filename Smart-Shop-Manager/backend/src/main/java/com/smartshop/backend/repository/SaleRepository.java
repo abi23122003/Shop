@@ -11,6 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Sale s where s.id = :id")
+    java.util.Optional<Sale> findByIdForUpdate(@Param("id") Long id);
+
     List<Sale> findBySaleDate(LocalDate saleDate);
 
     List<Sale> findBySaleDateBetween(LocalDate from, LocalDate to);

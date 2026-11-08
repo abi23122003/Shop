@@ -38,8 +38,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BadCredentialsException("Invalid username or password");
         }
 
+        org.springframework.security.core.Authentication authResult;
         try {
-            authenticationManager.authenticate(
+            authResult = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             username,
                             request.getPassword()
@@ -51,7 +52,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         loginAttemptService.recordSuccess(rateLimitKey);
-        String token = jwtService.generateToken(username);
+        String passwordHash = authResult.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails ud
+                ? ud.getPassword()
+                : null;
+        String token = jwtService.generateToken(username, passwordHash);
 
         return new LoginResponse(token);
     }

@@ -216,7 +216,8 @@ public void deleteSale(Long id) {
 @Transactional
 public void reverseSale(Long id, String reason) {
 
-    Sale sale = saleRepository.findById(id)
+    Sale sale = saleRepository.findByIdForUpdate(id)
+            .or(() -> saleRepository.findById(id))
             .orElseThrow(() -> new EntityNotFoundException("Sale not found with id: " + id));
 
     if ("REVERSED".equalsIgnoreCase(sale.getStatus())) {

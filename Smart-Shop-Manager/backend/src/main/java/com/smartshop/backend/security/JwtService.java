@@ -2,6 +2,7 @@ package com.smartshop.backend.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Function;
 
 import javax.crypto.SecretKey;
@@ -50,12 +51,21 @@ public class JwtService {
 
     // Generate JWT Token
     public String generateToken(String username) {
-        return Jwts.builder()
+        return generateToken(username, null);
+    }
+
+    public String generateToken(String username, String passwordHash) {
+        var builder = Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(key)
-                .compact();
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs));
+
+        if (passwordHash != null && !passwordHash.isEmpty()) {
+            builder.claim("pwd", passwordHash.substring(0, Math.min(16, passwordHash.length())));
+        }
+
+        return builder.signWith(key).compact();
     }
 
     // Extract username from JWT
@@ -86,9 +96,26 @@ public class JwtService {
 
     // Validate token
     public boolean validateToken(String token, String username) {
+        return validateToken(token, username, null);
+    }
+
+    public boolean validateToken(String token, String username, String currentPasswordHash) {
         try {
             String extractedUsername = extractUsername(token);
-            return extractedUsername.equals(username) && !isTokenExpired(token);
+            if (!extractedUsername.equals(username) || isTokenExpired(token)) {
+                return false;
+            }
+
+            if (currentPasswordHash != null && !currentPasswordHash.isEmpty()) {
+                String tokenPwd = extractClaim(token, claims -> claims.get("pwd", String.class));
+                if (tokenPwd != null) {
+                    String expected = currentPasswordHash.substring(0, Math.min(16, currentPasswordHash.length()));
+                    if (!expected.equals(tokenPwd)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
         } catch (JwtException | IllegalArgumentException ex) {
             return false;
         }
