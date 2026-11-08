@@ -19,3 +19,10 @@ export async function deleteOrRejectUser(id) {
   const { data } = await api.delete(`/admin/users/${id}`);
   return data;
 }
+
+export async function resetUserPassword(username, newPassword) {
+  const { data } = await api.post(`/users/${encodeURIComponent(username)}/reset-password`, {
+    newPassword,
+  });
+  return data;
+}

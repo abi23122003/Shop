@@ -1,5 +1,7 @@
 import { useState } from "react";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
@@ -16,14 +18,17 @@ import {
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { register } from "../services/authService";
 import { getApiErrorMessage } from "../services/apiErrors";
 import { paths } from "../routes/paths";
+import { useThemeMode } from "../context/useThemeMode";
 
 export default function Register() {
+  const { mode, toggleTheme } = useThemeMode();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -106,9 +111,22 @@ export default function Register() {
         display: "grid",
         placeItems: "center",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#FAF7F2",
+        bgcolor: "background.default",
+        position: "relative",
       }}
     >
+      <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 10 }}>
+        <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+          <IconButton
+            onClick={toggleTheme}
+            aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            sx={{ minWidth: 44, minHeight: 44 }}
+          >
+            {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+
       <Paper
         component="form"
         noValidate
@@ -118,7 +136,10 @@ export default function Register() {
           maxWidth: 960,
           borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 48px -12px rgba(28, 25, 23, 0.14), 0 0 0 1px #E7E0D5",
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark"
+              ? "0 24px 48px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px #44403C"
+              : "0 24px 48px -12px rgba(28, 25, 23, 0.14), 0 0 0 1px #E7E0D5",
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "1.05fr 0.95fr" },
         }}
@@ -213,12 +234,12 @@ export default function Register() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            bgcolor: "#ffffff",
+            bgcolor: "background.paper",
           }}
         >
           <Stack spacing={2.5} sx={{ width: "100%" }}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "#1C1917" }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "text.primary" }}>
                 Create account
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5, fontSize: "0.95rem" }}>

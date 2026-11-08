@@ -3,9 +3,12 @@ import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
+import LockResetOutlinedIcon from "@mui/icons-material/LockResetOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Alert,
   Badge,
@@ -21,6 +24,8 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  IconButton,
+  InputAdornment,
   Paper,
   Stack,
   Tab,
@@ -31,9 +36,10 @@ import {
   TableHead,
   TableRow,
   Tabs,
+  TextField,
   Typography,
 } from "@mui/material";
-import { approveUser, deleteOrRejectUser, getAllUsers } from "../services/adminUserService";
+import { approveUser, deleteOrRejectUser, getAllUsers, resetUserPassword } from "../services/adminUserService";
 import { getApiErrorMessage } from "../services/apiErrors";
 
 export default function UsersPage() {
@@ -45,6 +51,16 @@ export default function UsersPage() {
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null, action: null });
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Reset password dialog state
+  const [resetDialog, setResetDialog] = useState({
+    open: false,
+    username: "",
+    newPassword: "",
+    error: "",
+    loading: false,
+    showPassword: false,
+  });
 
   async function loadUsers() {
     setLoading(true);
@@ -114,6 +130,53 @@ export default function UsersPage() {
     }
   }
 
+  function openResetPassword(targetUsername = "") {
+    setResetDialog({
+      open: true,
+      username: targetUsername,
+      newPassword: "",
+      error: "",
+      loading: false,
+      showPassword: false,
+    });
+  }
+
+  async function handleResetPasswordSubmit(event) {
+    event.preventDefault();
+    const trimmedUsername = resetDialog.username.trim();
+    if (!trimmedUsername) {
+      setResetDialog((prev) => ({ ...prev, error: "Username is required." }));
+      return;
+    }
+    if (!resetDialog.newPassword || resetDialog.newPassword.length < 8) {
+      setResetDialog((prev) => ({
+        ...prev,
+        error: "New password must be at least 8 characters long.",
+      }));
+      return;
+    }
+
+    setResetDialog((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const response = await resetUserPassword(trimmedUsername, resetDialog.newPassword);
+      setSuccess(response.message || `Password reset successfully for user: ${trimmedUsername}`);
+      setResetDialog({
+        open: false,
+        username: "",
+        newPassword: "",
+        error: "",
+        loading: false,
+        showPassword: false,
+      });
+    } catch (err) {
+      setResetDialog((prev) => ({
+        ...prev,
+        loading: false,
+        error: getApiErrorMessage(err, `Failed to reset password for "${trimmedUsername}".`),
+      }));
+    }
+  }
+
   const displayedUsers = tabIndex === 0 ? pendingUsers : users;
 
   return (
@@ -137,15 +200,25 @@ export default function UsersPage() {
             </Typography>
           </Box>
 
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadUsers}
-            disabled={loading}
-            sx={{ alignSelf: { xs: "flex-start", sm: "center" }, borderRadius: 2 }}
-          >
-            Refresh
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}>
+            <Button
+              variant="outlined"
+              startIcon={<LockResetOutlinedIcon />}
+              onClick={() => openResetPassword("")}
+              sx={{ borderRadius: 2, textTransform: "none" }}
+            >
+              Reset password
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={loadUsers}
+              disabled={loading}
+              sx={{ borderRadius: 2 }}
+            >
+              Refresh
+            </Button>
+          </Stack>
         </Stack>
 
         {error && (
@@ -181,19 +254,19 @@ export default function UsersPage() {
           </Tabs>
 
           {loading ? (
-            <Box sx={{ p: 6, display: "grid", placeItems: "center" }}>
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 240 }}>
               <CircularProgress />
             </Box>
           ) : displayedUsers.length === 0 ? (
-            <Box sx={{ p: 6, textAlign: "center" }}>
+            <Box sx={{ p: 4, textAlign: "center" }}>
               <HourglassEmptyIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
               <Typography variant="h6" color="text.secondary">
-                {tabIndex === 0 ? "No pending account approvals" : "No users found"}
+                {tabIndex === 0 ? "No Pending Approvals" : "No Users Found"}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {tabIndex === 0
-                  ? "When new users register from the sign-up page, they will appear here for verification."
-                  : "Registered user accounts will be listed here."}
+                  ? "All registered accounts have been reviewed and approved."
+                  : "No user accounts are currently present."}
               </Typography>
             </Box>
           ) : (
@@ -202,7 +275,7 @@ export default function UsersPage() {
               <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: "#FAF7F2" }}>
+                    <TableRow sx={{ bgcolor: "background.default" }}>
                       <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Approval Status</TableCell>
@@ -219,7 +292,7 @@ export default function UsersPage() {
                                 width: 36,
                                 height: 36,
                                 borderRadius: "50%",
-                                bgcolor: user.role === "ROLE_ADMIN" ? "primary.100" : "grey.100",
+                                bgcolor: user.role === "ROLE_ADMIN" ? "primary.100" : "action.hover",
                                 color: user.role === "ROLE_ADMIN" ? "primary.main" : "text.secondary",
                                 display: "grid",
                                 placeItems: "center",
@@ -281,6 +354,16 @@ export default function UsersPage() {
                                 Approve
                               </Button>
                             )}
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<LockResetOutlinedIcon />}
+                              onClick={() => openResetPassword(user.username)}
+                              disabled={actionLoading}
+                              sx={{ borderRadius: 2, textTransform: "none" }}
+                            >
+                              Reset password
+                            </Button>
                             {!(user.role === "ROLE_ADMIN" && user.username === "admin") && (
                               <Button
                                 variant="outlined"
@@ -288,7 +371,7 @@ export default function UsersPage() {
                                 size="small"
                                 startIcon={<DeleteOutlineOutlinedIcon />}
                                 onClick={() =>
-                                  setConfirmDialog({
+                                   setConfirmDialog({
                                     open: true,
                                     user,
                                     action: user.approved ? "delete" : "reject",
@@ -322,7 +405,7 @@ export default function UsersPage() {
                                   width: 40,
                                   height: 40,
                                   borderRadius: "50%",
-                                  bgcolor: user.role === "ROLE_ADMIN" ? "primary.100" : "grey.100",
+                                  bgcolor: user.role === "ROLE_ADMIN" ? "primary.100" : "action.hover",
                                   color: user.role === "ROLE_ADMIN" ? "primary.main" : "text.secondary",
                                   display: "grid",
                                   placeItems: "center",
@@ -351,7 +434,7 @@ export default function UsersPage() {
 
                           <Divider />
 
-                          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+                          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end", flexWrap: "wrap", gap: 1 }}>
                             {!user.approved && (
                               <Button
                                 variant="contained"
@@ -366,6 +449,17 @@ export default function UsersPage() {
                                 Approve
                               </Button>
                             )}
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<LockResetOutlinedIcon />}
+                              onClick={() => openResetPassword(user.username)}
+                              disabled={actionLoading}
+                              fullWidth
+                              sx={{ borderRadius: 2, textTransform: "none" }}
+                            >
+                              Reset password
+                            </Button>
                             {!(user.role === "ROLE_ADMIN" && user.username === "admin") && (
                               <Button
                                 variant="outlined"
@@ -380,6 +474,7 @@ export default function UsersPage() {
                                   })
                                 }
                                 disabled={actionLoading}
+                                fullWidth
                                 sx={{ borderRadius: 2, textTransform: "none" }}
                               >
                                 {user.approved ? "Delete" : "Reject"}
@@ -420,6 +515,91 @@ export default function UsersPage() {
             disabled={actionLoading}
           >
             {confirmDialog.action === "reject" ? "Reject & Remove" : "Delete Account"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog
+        open={resetDialog.open}
+        onClose={() => !resetDialog.loading && setResetDialog((prev) => ({ ...prev, open: false }))}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            component: "form",
+            onSubmit: handleResetPasswordSubmit,
+          },
+        }}
+      >
+        <DialogTitle>Reset User Password</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {resetDialog.error && (
+              <Alert severity="error" sx={{ borderRadius: 2 }}>
+                {resetDialog.error}
+              </Alert>
+            )}
+            <DialogContentText variant="body2">
+              Enter the username and new password (minimum 8 characters) to reset this account&apos;s credentials.
+            </DialogContentText>
+            <TextField
+              label="Username"
+              value={resetDialog.username}
+              onChange={(e) => setResetDialog((prev) => ({ ...prev, username: e.target.value, error: "" }))}
+              required
+              fullWidth
+              autoFocus={!resetDialog.username}
+              disabled={resetDialog.loading}
+            />
+            <TextField
+              label="New Password"
+              type={resetDialog.showPassword ? "text" : "password"}
+              value={resetDialog.newPassword}
+              onChange={(e) => setResetDialog((prev) => ({ ...prev, newPassword: e.target.value, error: "" }))}
+              required
+              fullWidth
+              autoFocus={Boolean(resetDialog.username)}
+              disabled={resetDialog.loading}
+              helperText="Must be at least 8 characters long"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={resetDialog.showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setResetDialog((prev) => ({ ...prev, showPassword: !prev.showPassword }))}
+                        edge="end"
+                        size="small"
+                        tabIndex={-1}
+                      >
+                        {resetDialog.showPassword ? (
+                          <VisibilityOffOutlinedIcon fontSize="small" />
+                        ) : (
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setResetDialog((prev) => ({ ...prev, open: false }))}
+            disabled={resetDialog.loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={resetDialog.loading}
+          >
+            {resetDialog.loading ? "Resetting…" : "Reset Password"}
           </Button>
         </DialogActions>
       </Dialog>

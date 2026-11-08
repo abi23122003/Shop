@@ -1,6 +1,6 @@
 import { createTheme } from "@mui/material/styles";
 
-export const tokens = {
+export const lightTokens = {
   primary: "#C2410C",
   primaryHover: "#9A3412",
   accent: "#0F766E",
@@ -13,171 +13,205 @@ export const tokens = {
   danger: "#B42318",
 };
 
-export default createTheme({
-  palette: {
-    primary: {
-      main: tokens.primary,
-      dark: tokens.primaryHover,
-      light: "#EA580C",
-      contrastText: tokens.surface,
-      50: "#FFF7ED",
-      100: "#FFEDD5",
-    },
-    secondary: {
-      main: tokens.accent,
-      dark: "#115E59",
-      light: "#14B8A6",
-      contrastText: tokens.surface,
-    },
-    accent: {
-      main: tokens.accent,
-      dark: "#115E59",
-      contrastText: tokens.surface,
-    },
-    success: {
-      main: tokens.success,
-      dark: "#14532D",
-      light: "#22C55E",
-      contrastText: tokens.surface,
-    },
-    error: {
-      main: tokens.danger,
-      dark: "#912018",
-      light: "#EF4444",
-      contrastText: tokens.surface,
-    },
-    warning: {
-      main: "#92400E",
-      dark: "#78350F",
-      light: "#F59E0B",
-      contrastText: tokens.surface,
-    },
-    info: {
-      main: tokens.accent,
-      dark: "#115E59",
-      contrastText: tokens.surface,
-    },
-    dashboard: {
-      products: tokens.primary,
-      categories: tokens.accent,
-      customers: tokens.muted,
-      sales: tokens.success,
-    },
-    background: {
-      default: tokens.background,
-      paper: tokens.surface,
-    },
-    text: {
-      primary: tokens.text,
-      secondary: tokens.muted,
-    },
-    divider: tokens.border,
-  },
-  shape: { borderRadius: 14 },
-  typography: {
-    fontFamily: "Inter, Segoe UI, Roboto, Arial, sans-serif",
-    h4: { fontWeight: 800, letterSpacing: "-0.02em", color: tokens.text },
-    h5: { fontWeight: 700, letterSpacing: "-0.01em", color: tokens.text },
-    h6: { fontWeight: 700, color: tokens.text },
-    button: { textTransform: "none", fontWeight: 600 },
-  },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          backgroundColor: tokens.background,
-          color: tokens.text,
-          backgroundImage:
-            "radial-gradient(circle at top left, rgba(194, 65, 12, 0.08), transparent 32%), radial-gradient(circle at bottom right, rgba(15, 118, 110, 0.06), transparent 24%)",
-          backgroundAttachment: "fixed",
-        },
+export const darkTokens = {
+  primary: "#F97316",
+  primaryHover: "#EA580C",
+  accent: "#14B8A6",
+  background: "#1C1917",
+  surface: "#292524",
+  text: "#FAFAF9",
+  muted: "#A8A29E",
+  border: "#44403C",
+  success: "#166534",
+  danger: "#B42318",
+};
+
+export const tokens = lightTokens;
+
+export function getTheme(mode = "light") {
+  const isDark = mode === "dark";
+  const currentTokens = isDark ? darkTokens : lightTokens;
+
+  return createTheme({
+    palette: {
+      mode: isDark ? "dark" : "light",
+      primary: {
+        main: currentTokens.primary,
+        dark: currentTokens.primaryHover,
+        light: isDark ? "#FB923C" : "#EA580C",
+        contrastText: isDark ? "#1C1917" : "#FFFFFF",
+        50: isDark ? "rgba(249, 115, 22, 0.12)" : "#FFF7ED",
+        100: isDark ? "rgba(249, 115, 22, 0.2)" : "#FFEDD5",
       },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundImage: "linear-gradient(135deg, #1C1917 0%, #292524 60%, #C2410C 100%)",
-          backdropFilter: "blur(14px)",
-          boxShadow: "0 12px 30px rgba(28, 25, 23, 0.18)",
-          borderBottom: "1px solid rgba(231, 224, 213, 0.2)",
-        },
+      secondary: {
+        main: currentTokens.accent,
+        dark: isDark ? "#0F766E" : "#115E59",
+        light: isDark ? "#2DD4BF" : "#14B8A6",
+        contrastText: "#FFFFFF",
       },
-    },
-    MuiPaper: {
-      defaultProps: { elevation: 0 },
-      styleOverrides: {
-        root: {
-          backgroundColor: tokens.surface,
-          border: `1px solid ${tokens.border}`,
-          boxShadow: "0 18px 45px rgba(28, 25, 23, 0.06)",
-        },
+      accent: {
+        main: currentTokens.accent,
+        dark: isDark ? "#0F766E" : "#115E59",
+        contrastText: "#FFFFFF",
       },
+      success: {
+        main: currentTokens.success,
+        dark: "#14532D",
+        light: "#22C55E",
+        contrastText: "#FFFFFF",
+      },
+      error: {
+        main: currentTokens.danger,
+        dark: "#912018",
+        light: "#EF4444",
+        contrastText: "#FFFFFF",
+      },
+      warning: {
+        main: isDark ? "#F59E0B" : "#92400E",
+        dark: "#78350F",
+        light: "#FBBF24",
+        contrastText: isDark ? "#1C1917" : "#FFFFFF",
+      },
+      info: {
+        main: currentTokens.accent,
+        dark: isDark ? "#0F766E" : "#115E59",
+        contrastText: "#FFFFFF",
+      },
+      dashboard: {
+        products: currentTokens.primary,
+        categories: currentTokens.accent,
+        customers: currentTokens.muted,
+        sales: currentTokens.success,
+      },
+      background: {
+        default: currentTokens.background,
+        paper: currentTokens.surface,
+      },
+      text: {
+        primary: currentTokens.text,
+        secondary: currentTokens.muted,
+      },
+      divider: currentTokens.border,
     },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          minHeight: 44,
-          "&:focus-visible": {
-            outline: "3px solid",
-            outlineColor: tokens.primary,
-            outlineOffset: 2,
-          },
-        },
-        containedPrimary: {
-          backgroundColor: tokens.primary,
-          color: tokens.surface,
-          "&:hover": {
-            backgroundColor: tokens.primaryHover,
-          },
-        },
-        containedSuccess: {
-          backgroundColor: tokens.success,
-          color: tokens.surface,
-          "&:hover": {
-            backgroundColor: "#14532D",
-          },
-        },
-        containedError: {
-          backgroundColor: tokens.danger,
-          color: tokens.surface,
-          "&:hover": {
-            backgroundColor: "#912018",
+    shape: { borderRadius: 14 },
+    typography: {
+      fontFamily: "Inter, Segoe UI, Roboto, Arial, sans-serif",
+      h4: { fontWeight: 800, letterSpacing: "-0.02em", color: currentTokens.text },
+      h5: { fontWeight: 700, letterSpacing: "-0.01em", color: currentTokens.text },
+      h6: { fontWeight: 700, color: currentTokens.text },
+      button: { textTransform: "none", fontWeight: 600 },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: currentTokens.background,
+            color: currentTokens.text,
+            backgroundImage: isDark
+              ? "radial-gradient(circle at top left, rgba(249, 115, 22, 0.05), transparent 32%), radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.04), transparent 24%)"
+              : "radial-gradient(circle at top left, rgba(194, 65, 12, 0.08), transparent 32%), radial-gradient(circle at bottom right, rgba(15, 118, 110, 0.06), transparent 24%)",
+            backgroundAttachment: "fixed",
           },
         },
       },
-    },
-    MuiIconButton: {
-      styleOverrides: {
-        root: {
-          minWidth: 44,
-          minHeight: 44,
-          "&:focus-visible": {
-            outline: "3px solid",
-            outlineColor: tokens.primary,
-            outlineOffset: 2,
+      MuiAppBar: {
+        styleOverrides: {
+          root: {
+            backgroundImage: isDark
+              ? "linear-gradient(135deg, #1C1917 0%, #292524 60%, #44403C 100%)"
+              : "linear-gradient(135deg, #1C1917 0%, #292524 60%, #C2410C 100%)",
+            backdropFilter: "blur(14px)",
+            boxShadow: isDark
+              ? "0 12px 30px rgba(0, 0, 0, 0.4)"
+              : "0 12px 30px rgba(28, 25, 23, 0.18)",
+            borderBottom: `1px solid ${isDark ? "#44403C" : "rgba(231, 224, 213, 0.2)"}`,
           },
         },
       },
-    },
-    MuiToggleButton: {
-      styleOverrides: {
-        root: {
-          minHeight: 44,
-          "&:focus-visible": {
-            outline: "3px solid",
-            outlineColor: tokens.primary,
-            outlineOffset: 2,
+      MuiPaper: {
+        defaultProps: { elevation: 0 },
+        styleOverrides: {
+          root: {
+            backgroundColor: currentTokens.surface,
+            border: `1px solid ${currentTokens.border}`,
+            boxShadow: isDark
+              ? "0 18px 45px rgba(0, 0, 0, 0.3)"
+              : "0 18px 45px rgba(28, 25, 23, 0.06)",
           },
-          "&.Mui-selected": {
-            backgroundColor: "rgba(194, 65, 12, 0.12)",
-            color: tokens.primary,
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
+            minHeight: 44,
+            "&:focus-visible": {
+              outline: "3px solid",
+              outlineColor: currentTokens.primary,
+              outlineOffset: 2,
+            },
+          },
+          containedPrimary: {
+            backgroundColor: currentTokens.primary,
+            color: isDark ? "#1C1917" : "#FFFFFF",
             "&:hover": {
-              backgroundColor: "rgba(194, 65, 12, 0.18)",
+              backgroundColor: currentTokens.primaryHover,
+            },
+          },
+          containedSuccess: {
+            backgroundColor: currentTokens.success,
+            color: "#FFFFFF",
+            "&:hover": {
+              backgroundColor: "#14532D",
+            },
+          },
+          containedError: {
+            backgroundColor: currentTokens.danger,
+            color: "#FFFFFF",
+            "&:hover": {
+              backgroundColor: "#912018",
+            },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            minWidth: 44,
+            minHeight: 44,
+            "&:focus-visible": {
+              outline: "3px solid",
+              outlineColor: currentTokens.primary,
+              outlineOffset: 2,
+            },
+          },
+        },
+      },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: {
+            minHeight: 44,
+            "&:focus-visible": {
+              outline: "3px solid",
+              outlineColor: currentTokens.primary,
+              outlineOffset: 2,
+            },
+            "&.Mui-selected": {
+              backgroundColor: isDark
+                ? "rgba(249, 115, 22, 0.18)"
+                : "rgba(194, 65, 12, 0.12)",
+              color: currentTokens.primary,
+              "&:hover": {
+                backgroundColor: isDark
+                  ? "rgba(249, 115, 22, 0.25)"
+                  : "rgba(194, 65, 12, 0.18)",
+              },
             },
           },
         },
       },
     },
-  },
-});
+  });
+}
+
+export default getTheme("light");

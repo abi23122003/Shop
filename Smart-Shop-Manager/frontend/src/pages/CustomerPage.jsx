@@ -4,7 +4,7 @@ import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
 import MessageOutlinedIcon from "@mui/icons-material/MessageOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography, useTheme } from "@mui/material";
 import api from "../services/api";
 import { getApiErrorMessage } from "../services/apiErrors";
 import { formatDateOnly } from "../utils/dateUtils";
@@ -37,11 +37,28 @@ function customerType(customer) {
 }
 
 function CustomerTypeTag({ customer }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const type = customerType(customer);
   const tags = {
-    credit: ["Credit", { bgcolor: "#DBEAFE", color: "#1E40AF" }],
-    sometimes: ["Sometimes pays", { bgcolor: "#FEF3C7", color: "#92400E" }],
-    instant: ["Pays instantly", { bgcolor: "#DCFCE7", color: "#166534" }],
+    credit: [
+      "Credit",
+      isDark
+        ? { bgcolor: "rgba(30, 64, 175, 0.35)", color: "#93C5FD", border: "1px solid rgba(147, 197, 253, 0.35)" }
+        : { bgcolor: "#DBEAFE", color: "#1E40AF" },
+    ],
+    sometimes: [
+      "Sometimes pays",
+      isDark
+        ? { bgcolor: "rgba(146, 64, 14, 0.35)", color: "#FDE68A", border: "1px solid rgba(253, 230, 138, 0.35)" }
+        : { bgcolor: "#FEF3C7", color: "#92400E" },
+    ],
+    instant: [
+      "Pays instantly",
+      isDark
+        ? { bgcolor: "rgba(22, 101, 52, 0.35)", color: "#86EFAC", border: "1px solid rgba(134, 239, 172, 0.35)" }
+        : { bgcolor: "#DCFCE7", color: "#166534" },
+    ],
   };
   const [label, customSx] = tags[type];
   return <Chip label={label} size="small" sx={{ ...customSx, fontWeight: 600 }} />;

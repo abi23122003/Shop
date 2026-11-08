@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { register, login } from "../src/services/authService.js";
+import { resetUserPassword } from "../src/services/adminUserService.js";
 import api from "../src/services/api.js";
 
 // Helper validator replicating Register component validation logic
@@ -106,6 +107,31 @@ test("login service communicates with /auth/login endpoint", async () => {
     assert.equal(capturedUrl, "/auth/login");
     assert.deepEqual(capturedBody, { username: "admin", password: "Pavi@2003" });
     assert.equal(result.token, "mocked-jwt-token-xyz");
+  } finally {
+    api.post = originalPost;
+  }
+});
+
+test("resetUserPassword sends expected POST payload to /users/{username}/reset-password", async () => {
+  const originalPost = api.post;
+  let capturedUrl = "";
+  let capturedBody = null;
+
+  api.post = async (url, body) => {
+    capturedUrl = url;
+    capturedBody = body;
+    return {
+      data: {
+        message: "Password reset successfully for user: cashier1",
+      },
+    };
+  };
+
+  try {
+    const result = await resetUserPassword("cashier1", "NewSecurePass123!");
+    assert.equal(capturedUrl, "/users/cashier1/reset-password");
+    assert.deepEqual(capturedBody, { newPassword: "NewSecurePass123!" });
+    assert.equal(result.message, "Password reset successfully for user: cashier1");
   } finally {
     api.post = originalPost;
   }
