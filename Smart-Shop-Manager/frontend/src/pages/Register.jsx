@@ -106,7 +106,7 @@ export default function Register() {
         display: "grid",
         placeItems: "center",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#f1f5f9",
+        bgcolor: "#FAF7F2",
       }}
     >
       <Paper
@@ -118,7 +118,7 @@ export default function Register() {
           maxWidth: 960,
           borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 48px -12px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06)",
+          boxShadow: "0 24px 48px -12px rgba(28, 25, 23, 0.14), 0 0 0 1px #E7E0D5",
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "1.05fr 0.95fr" },
         }}
@@ -133,7 +133,7 @@ export default function Register() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            background: "linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)",
+            background: "linear-gradient(135deg, #C2410C 0%, #1C1917 100%)",
           }}
         >
           <Box sx={{ position: "relative", zIndex: 1 }}>
@@ -218,7 +218,7 @@ export default function Register() {
         >
           <Stack spacing={2.5} sx={{ width: "100%" }}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "#0f172a" }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "#1C1917" }}>
                 Create account
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5, fontSize: "0.95rem" }}>
@@ -248,7 +248,7 @@ export default function Register() {
                     textTransform: "none",
                     fontSize: "1rem",
                     borderRadius: 2,
-                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                    boxShadow: "0 4px 12px rgba(194, 65, 12, 0.25)",
                   }}
                 >
                   Proceed to Sign In
@@ -367,7 +367,7 @@ export default function Register() {
                     textTransform: "none",
                     fontSize: "1rem",
                     borderRadius: 2,
-                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                    boxShadow: "0 4px 12px rgba(194, 65, 12, 0.25)",
                   }}
                 >
                   {isSubmitting ? (

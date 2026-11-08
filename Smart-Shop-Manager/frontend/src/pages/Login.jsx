@@ -80,7 +80,7 @@ export default function Login() {
         display: "grid",
         placeItems: "center",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#f1f5f9",
+        bgcolor: "#FAF7F2",
       }}
     >
       <Paper
@@ -92,7 +92,7 @@ export default function Login() {
           maxWidth: 960,
           borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 48px -12px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06)",
+          boxShadow: "0 24px 48px -12px rgba(28, 25, 23, 0.14), 0 0 0 1px #E7E0D5",
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "1.05fr 0.95fr" },
         }}
@@ -109,9 +109,9 @@ export default function Login() {
             justifyContent: "space-between",
             minHeight: { xs: 240, md: 540 },
             backgroundImage: `
-              radial-gradient(circle at 85% 15%, rgba(59, 130, 246, 0.3) 0%, transparent 45%),
-              radial-gradient(circle at 15% 85%, rgba(13, 148, 136, 0.25) 0%, transparent 50%),
-              linear-gradient(135deg, #091224 0%, #1e3a8a 52%, #0d9488 100%)
+              radial-gradient(circle at 85% 15%, rgba(194, 65, 12, 0.35) 0%, transparent 45%),
+              radial-gradient(circle at 15% 85%, rgba(15, 118, 110, 0.3) 0%, transparent 50%),
+              linear-gradient(135deg, #1C1917 0%, #C2410C 52%, #0F766E 100%)
             `,
           }}
         >
@@ -144,7 +144,7 @@ export default function Login() {
                 boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.25)",
               }}
             >
-              <StorefrontIcon sx={{ fontSize: 30, color: "#93c5fd" }} />
+              <StorefrontIcon sx={{ fontSize: 30, color: "#FED7AA" }} />
             </Box>
 
             <Typography
@@ -208,7 +208,7 @@ export default function Login() {
         >
           <Stack spacing={3} sx={{ width: "100%" }}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "#0f172a" }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.6rem", sm: "1.9rem" }, color: "#1C1917" }}>
                 Welcome back
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5, fontSize: "0.95rem" }}>
@@ -294,7 +294,7 @@ export default function Login() {
                 textTransform: "none",
                 fontSize: "1rem",
                 borderRadius: 2,
-                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                boxShadow: "0 4px 12px rgba(194, 65, 12, 0.25)",
               }}
             >
               {isSubmitting ? (

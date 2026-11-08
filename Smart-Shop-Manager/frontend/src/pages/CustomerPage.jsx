@@ -38,9 +38,13 @@ function customerType(customer) {
 
 function CustomerTypeTag({ customer }) {
   const type = customerType(customer);
-  const tags = { credit: ["Credit", "primary"], sometimes: ["Sometimes pays", "warning"], instant: ["Pays instantly", "success"] };
-  const [label, color] = tags[type];
-  return <Chip label={label} color={color} size="small" />;
+  const tags = {
+    credit: ["Credit", { bgcolor: "#DBEAFE", color: "#1E40AF" }],
+    sometimes: ["Sometimes pays", { bgcolor: "#FEF3C7", color: "#92400E" }],
+    instant: ["Pays instantly", { bgcolor: "#DCFCE7", color: "#166534" }],
+  };
+  const [label, customSx] = tags[type];
+  return <Chip label={label} size="small" sx={{ ...customSx, fontWeight: 600 }} />;
 }
 
 export default function CustomerPage() {

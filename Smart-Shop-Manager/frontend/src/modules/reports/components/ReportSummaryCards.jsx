@@ -5,8 +5,8 @@ import { Card, CardContent, Grid, Stack, Typography } from "@mui/material";
 const money = (value) => `₹${Number(value ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
 const metrics = [
-  ["Total sales", "totalSales", PaidOutlinedIcon, "#1565c0"],
-  ["Total profit", "totalProfit", AssessmentOutlinedIcon, "#2e7d32"],
+  ["Total sales", "totalSales", PaidOutlinedIcon, "#C2410C"],
+  ["Total profit", "totalProfit", AssessmentOutlinedIcon, "#166534"],
 ];
 
 export default function ReportSummaryCards({ loading, profit }) {

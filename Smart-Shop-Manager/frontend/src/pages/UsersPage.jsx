@@ -202,7 +202,7 @@ export default function UsersPage() {
               <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: "grey.50" }}>
+                    <TableRow sx={{ bgcolor: "#FAF7F2" }}>
                       <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Approval Status</TableCell>
